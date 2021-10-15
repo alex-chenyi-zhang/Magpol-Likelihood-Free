@@ -1,0 +1,10 @@
+name = "magpoly"
+uuid = "5ba1cc15-aa89-4379-a3b2-f05035ec000c"
+authors = ["alex-chenyi-zhang <chzhang@sissa.it>"]
+version = "0.1.0"
+
+[deps]
+DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
+GR = "28b8d3ca-fb5f-59d9-8090-bfdbd6d07a71"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
