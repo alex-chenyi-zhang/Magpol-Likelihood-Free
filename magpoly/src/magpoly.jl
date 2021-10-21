@@ -5,8 +5,8 @@ function simulation(n_monomers::Int, n_steps::Int)
     #pol = Magnetic_polymer(20, 1.2, 1.0, 0.5, [], [], Array{Int}(undef, 0, 0))
     #initialize_poly(pol)
     beta_temp = 1.0
-    spins_coupling = 0.5
-    alpha = 0.5
+    spins_coupling = 0.0
+    alpha = 1.0
     
     simulation_data = MC_data(n_steps)
     polymer = Magnetic_polymer(n_monomers, beta_temp, spins_coupling, alpha)
