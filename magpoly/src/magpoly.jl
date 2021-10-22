@@ -4,8 +4,8 @@ include("structures_and_functions.jl")
 function simulation(n_monomers::Int, n_steps::Int)
     #pol = Magnetic_polymer(20, 1.2, 1.0, 0.5, [], [], Array{Int}(undef, 0, 0))
     #initialize_poly(pol)
-    beta_temp = 1.0
-    spins_coupling = 0.0
+    beta_temp = 0.4
+    spins_coupling = 1.0
     alpha = 1.0
     
     simulation_data = MC_data(n_steps)
