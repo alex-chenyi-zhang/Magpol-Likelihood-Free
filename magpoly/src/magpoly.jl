@@ -13,6 +13,7 @@ function simulation(n_monomers::Int, n_steps::Int)
 
     initialize_poly!(polymer)
     MC_run!(polymer, simulation_data)
+    write_results(polymer, simulation_data)
     #display_polymer(polymer)
 
     burn_in = floor(Int, 20*(n_monomers^(1.11)))

@@ -1,5 +1,5 @@
-using Random, Distributions
-Random.seed!(1996)
+using Random, Distributions, DelimitedFiles
+Random.seed!()
 
 # Here I define the global quantities used by all pivot MCMC run which are the pivot moves
 const pivot_moves = Array{Int,3}(zeros(47, 2, 3)) # Tensor that defines all the pivot moves of the octahedral symmetry group
@@ -14,16 +14,11 @@ for i in 1:6
             pivot_moves[p_moves_count, 1, :] .= perms[i,:]
             pivot_moves[p_moves_count, 2, :] .= tr_signs[j,:]
             
-            #println("i,j=",i,", ",j)
-            #println("p_moves_count= ", p_moves_count)
-            #println(pivot_moves[p_moves_count,:,:])
             global p_moves_count += 1
         end
     end
 end
-#for i in 1:47
-#    println(pivot_moves[i,:,:])
-#end
+
 #########################################################################
 #########################################################################
 
@@ -52,7 +47,7 @@ function initialize_poly!(poly::Magnetic_polymer)
     poly.spins .= rand((-1,1), poly.n_mono)
     poly.fields .= (rand(poly.n_mono).*2) .-1
     for i_mono in 1:poly.n_mono
-        poly.coord[1, i_mono] = i_mono
+        poly.coord[1, i_mono] = i_mono-1
     end    
     for i_mono in 1:poly.n_mono
         for j in 1:3
@@ -88,11 +83,10 @@ struct MC_data{T1<:Int, T2<:AbstractFloat}
     energies::Array{T2}
     magnetization::Array{T2}
     rg2::Array{T2}
-    re2::Array{T1}
 end
 
 function MC_data(n_steps::Int)
-    MC_data(n_steps, zeros(n_steps), zeros(n_steps), zeros(n_steps), zeros(Int, n_steps))
+    MC_data(n_steps, zeros(n_steps), zeros(n_steps), zeros(n_steps))
 end
 
 #########################################################################
@@ -255,9 +249,7 @@ function MC_run!(pol::Magnetic_polymer, traj::MC_data)
     println(energy)
 
     traj.energies[1] = energy
-    for j in 1:3
-        traj.re2[1] += pol.coord[j,end]^2 
-    end
+    traj.magnetization = mean(pol.spins)
     traj.rg2[1] = gyration_radius_squared(pol)
 
 
@@ -292,11 +284,8 @@ function MC_run!(pol::Magnetic_polymer, traj::MC_data)
             end
         end
         
-        for j in 1:3
-            traj.re2[i_step] += pol.coord[j,end]^2 
-        end
         traj.rg2[i_step] = gyration_radius_squared(pol)
-
+        traj.magnetization = mean(pol.spins)
         energy += spins_MC!(pol, pol.n_mono,pol.fields,pol.spins,pol.neighbours) ## spins_MC! return the total energy variation of the accepted spin n_flips
         traj.energies[i_step] = energy
 
@@ -304,6 +293,16 @@ function MC_run!(pol::Magnetic_polymer, traj::MC_data)
     end
     println("Fraction of accepted moves: ", n_acc/(traj.n_steps-1))
 end
+
+function write_results(pol::Magnetic_polymer, traj::MC_data)
+    open("config.txt", "w") do io
+        writedlm(io, [transpose(pol.coord) pol.spins])
+    end
+    open("MC_data.txt", "w") do io
+        writedlm(io, [traj.energies, traj.magnetization, traj.rg2])
+    end
+end
+
 
 
 
