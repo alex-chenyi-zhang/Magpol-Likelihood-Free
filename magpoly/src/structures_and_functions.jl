@@ -193,8 +193,22 @@ function compute_new_energy(pol::Magnetic_polymer, near::Array{Int,2}, ff::Array
     return ene*(1-pol.alpha) + ene_J*pol.alpha
 end
 
-#########################################################################
 
+#########################################################################
+#########################################################################
+### In this section I there are the functions to perform local moves on the self-avoiding walk
+
+#function single_bead_flip!(t_coo::Array{Int,2}, dic::Dict{Int, Int})
+
+#end
+
+
+
+
+
+
+#########################################################################
+#########################################################################
 function spins_MC!(pol::Magnetic_polymer, n_flips::Int, ff::Array{Float64}, s::Array{Int}, near::Array{Int,2})
     delta_tot = 0.0
     for i_flip in 1:n_flips
