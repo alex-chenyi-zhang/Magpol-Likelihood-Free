@@ -16,10 +16,9 @@ function simulation(n_monomers::Int, n_steps::Int)
     write_results(polymer, simulation_data)
     #display_polymer(polymer)
 
-    burn_in = floor(Int, 20*(n_monomers^(1.11)))
-    result1 = mean(simulation_data.re2[burn_in:end])
-    result2 = mean(simulation_data.rg2[burn_in:end])
-    return (result1,result2)
+    #burn_in = floor(Int, 20*(n_monomers^(1.11)))
+    #result = mean(simulation_data.rg2[burn_in:end])
+    #return result
 end
 
 end # module
