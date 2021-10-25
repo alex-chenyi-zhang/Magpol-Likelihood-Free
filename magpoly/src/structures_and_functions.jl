@@ -266,7 +266,7 @@ function MC_run!(pol::Magnetic_polymer, traj::MC_data)
     traj.magnetization = mean(pol.spins)
     traj.rg2[1] = gyration_radius_squared(pol)
 
-
+    empty!(pol.hash_saw)
     for i_step in 2:traj.n_steps
         pivot = rand(2:pol.n_mono-1)
         p_move = rand(1:47)
