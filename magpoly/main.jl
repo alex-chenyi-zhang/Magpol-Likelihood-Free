@@ -20,7 +20,7 @@ RG2 = Float64[]
     println(REE, "\n")
     println(RG2,"\n")
     println(REE./RG2)=#
-    magpoly.simulation(20,2)
+    magpoly.simulation(200,500000)
     
 end
 
