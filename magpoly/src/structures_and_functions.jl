@@ -1,4 +1,5 @@
-using Random, Distributions, DelimitedFiles
+using Random, Distributions#, DelimitedFiles
+using CSV, Tables
 Random.seed!()
 
 # Here I define the global quantities used by all pivot MCMC run which are the pivot moves
@@ -45,7 +46,7 @@ end
 
 function initialize_poly!(poly::Magnetic_polymer)
     poly.spins .= rand((-1,1), poly.n_mono)
-    poly.fields .= (rand(poly.n_mono).*2) .-1
+    #poly.fields .= (rand(poly.n_mono).*2) .-1
     for i_mono in 1:poly.n_mono
         poly.coord[1, i_mono] = i_mono-1
     end    
@@ -145,16 +146,18 @@ function compute_neighbours!(coo::Array{Int,2}, near::Array{Int,2}, dic::Dict{In
         for j in 2:7
             near[j, i_mono] = -1
         end
+        saw_key_base = coo[1,i_mono]*a^2 + coo[2,i_mono]*a + coo[3,i_mono]
         for j in 1:3
             for k in -1:2:1
-                coo[j,i_mono] += k
-                saw_key = coo[1,i_mono]*a^2 + coo[2,i_mono]*a + coo[3,i_mono]
+                #coo[j,i_mono] += k
+                #saw_key = coo[1,i_mono]*a^2 + coo[2,i_mono]*a + coo[3,i_mono]
+                saw_key = saw_key_base + k*a^(3-j)
                 if haskey(dic, saw_key)
                     near[1, i_mono] += 1
                     n_neigh = near[1, i_mono]+1
                     near[n_neigh, i_mono] = dic[saw_key]
                 end
-                coo[j,i_mono] -= k
+                #coo[j,i_mono] -= k
             end
         end
     end
@@ -187,7 +190,7 @@ function compute_new_energy(pol::Magnetic_polymer, near::Array{Int,2}, ff::Array
     for i_mono in 1:pol.n_mono
         ene -= ff[i_mono] * s[i_mono]
         for j in 1:near[1, i_mono]
-            ene_J -= s[i_mono] * s[near[j+1,i_mono]] * pol.J/2.0
+            ene_J -= s[i_mono] * s[near[j+1,i_mono]] * pol.J * 0.5
         end
     end
     return ene*(1-pol.alpha) + ene_J*pol.alpha
@@ -198,13 +201,109 @@ end
 #########################################################################
 ### In this section I there are the functions to perform local moves on the self-avoiding walk
 
-#function single_bead_flip!(t_coo::Array{Int,2}, dic::Dict{Int, Int})
+function single_bead_flip!(t_coo::Array{Int,2}, dic::Dict{Int, Int}, n_mono::Int, a::Int)
+    mono = rand(2:n_mono-1)
+    dist = 0
+    for j in 1:3
+        dist += (t_coo[j,mono+1]-t_coo[j,mono-1])^2
+    end
+    if dist == 2
+        saw_key = 0
+        for j in 1:3
+            saw_key += (t_coo[j,mono-1]+t_coo[j,mono+1]-t_coo[j,mono])*a^(3-j)
+        end
+        
+        if !haskey(dic,saw_key)
+            delete!(dic, t_coo[1,mono]*a^2 + t_coo[2,mono]*a + t_coo[3,mono])
+            for j in 1:3
+                t_coo[j,mono] = t_coo[j,mono-1]+t_coo[j,mono+1]-t_coo[j,mono]
+            end
+            dic[saw_key] = mono
+        end
+    end
+end
 
-#end
+#########################################################################
 
+function crankshaft_180!(t_coo::Array{Int,2}, dic::Dict{Int, Int}, n_mono::Int, a::Int)
+    mono = rand(1:n_mono-3)
+    dist = 0
+    for j in 1:3
+        dist += (t_coo[j,mono+3]-t_coo[j,mono])^2
+    end
+    if dist==1
+        saw_key1 = 0
+        saw_key2 = 0
+        for j in 1:3
+            saw_key1 += (2*t_coo[j,mono] - t_coo[j,mono+1])*a^(3-j)
+            saw_key2 += (2*t_coo[j,mono+3] - t_coo[j,mono+2])*a^(3-j)
+        end
+        if !haskey(dic,saw_key1) && !haskey(dic,saw_key2)
+            delete!(dic, t_coo[1,mono+1]*a^2 + t_coo[2,mono+1]*a + t_coo[3,mono+1])
+            delete!(dic, t_coo[1,mono+2]*a^2 + t_coo[2,mono+2]*a + t_coo[3,mono+2])
+            for j in 1:3
+                t_coo[j,mono+1] = 2*t_coo[j,mono] - t_coo[j,mono+1]
+                t_coo[j,mono+2] = 2*t_coo[j,mono+3] - t_coo[j,mono+2]
+            end
+            dic[saw_key1] = mono+1
+            dic[saw_key2] = mono+2
+        end
+    end
+end
 
+#########################################################################
 
-
+function crankshaft_90_270!(t_coo::Array{Int,2}, dic::Dict{Int, Int}, n_mono::Int, a::Int, new_coord1::Array{Int}, new_coord2::Array{Int})
+    mono = rand(1:n_mono-3)
+    dist = 0
+    axis = 0
+    for j in 1:3
+        dist += (t_coo[j,mono+3]-t_coo[j,mono])^2
+    end
+    if dist == 1
+        orient = 0
+        for j in 1:3
+            if (t_coo[j,mono+3]-t_coo[j,mono]) != 0
+                axis = j
+                orient = t_coo[j,mono+3]-t_coo[j,mono]
+                break
+            end
+        end
+        p=0
+        t=0
+        if axis==1
+            p=2
+            t=rand((3,2))
+        elseif axis==2
+            p=6
+            t=rand((2,5))
+        elseif axis==3
+            p=3
+            t=rand((5,3))
+        else
+            println("Invalid Rotation Axis!")
+        end
+        #new_coord1 = zeros(Int,3)
+        #new_coord2 = zeros(Int,3)
+        for j in 1:3 
+            new_coord1[j] = t_coo[j,mono] + tr_signs[t,j]*(t_coo[perms[p,j],mono+1]-t_coo[perms[p,j],mono])*orient
+            new_coord2[j] = t_coo[j,mono+3] + tr_signs[t,j]*(t_coo[perms[p,j],mono+2]-t_coo[perms[p,j],mono+3])*orient
+        end
+        
+        saw_key1 = new_coord1[1]*a^2 + new_coord1[2]*a + new_coord1[3]
+        saw_key2 = new_coord2[1]*a^2 + new_coord2[2]*a + new_coord2[3]
+        if !haskey(dic,saw_key1) && !haskey(dic,saw_key2)
+            delete!(dic, t_coo[1,mono+1]*a^2 + t_coo[2,mono+1]*a + t_coo[3,mono+1])
+            delete!(dic, t_coo[1,mono+2]*a^2 + t_coo[2,mono+2]*a + t_coo[3,mono+2])
+            for j in 1:3
+                t_coo[j,mono+1] = new_coord1[j]
+                t_coo[j,mono+2] = new_coord2[j]
+            end
+            dic[saw_key1] = mono+1
+            dic[saw_key2] = mono+2
+        end
+    end 
+end
 
 
 #########################################################################
@@ -245,7 +344,10 @@ end
 #########################################################################
 
 function MC_run!(pol::Magnetic_polymer, traj::MC_data)
+    new_coord1 = zeros(Int,3)
+    new_coord2 = zeros(Int,3)
     n_acc = 0
+    n_pivots = 0
     #=
       I represent the possible positions of the monomers in the cubic lattice
       as seeing the vector of coordinates as the representation in base "hash_base".
@@ -263,58 +365,97 @@ function MC_run!(pol::Magnetic_polymer, traj::MC_data)
     println(energy)
 
     traj.energies[1] = energy
-    traj.magnetization = mean(pol.spins)
+    traj.magnetization[1] = mean(pol.spins)
     traj.rg2[1] = gyration_radius_squared(pol)
 
     empty!(pol.hash_saw)
+
     for i_step in 2:traj.n_steps
         pivot = rand(2:pol.n_mono-1)
         p_move = rand(1:47)
-        if i_step%100000 == 0
+        if i_step%10000 == 0
             println("Pivot: ", pivot)
             println("Attmpted move: ", p_move)
             println("step number: ", i_step, "\n")
         end
         try_pivot!(pivot, p_move, pol.coord, pol.trial_coord, pol.n_mono)
         still_saw = checksaw!(pivot, pol, hash_base)
-        
-        if still_saw
-            compute_neighbours!(pol.trial_coord, pol.trial_neighbours, pol.hash_saw, hash_base, pol.n_mono)
-            trial_energy = compute_new_energy(pol,pol.trial_neighbours,pol.fields, pol.spins)
-            delta_energy = trial_energy - energy
-            acc = 0.0
-            delta_energy<=0 ? acc=1.0 : acc=exp(-delta_energy*pol.inv_temp)
-            if acc > rand()
-                for i_mono in 1:pol.n_mono
-                    for j in 1:3
-                        pol.coord[j,i_mono] = pol.trial_coord[j,i_mono]
-                    end
-                    for j in 1:7
-                        pol.neighbours[j,i_mono] = pol.trial_neighbours[j,i_mono]
-                    end
+
+
+        # If the pivot move was unsuccessful try next move on the previous configuration
+        if !still_saw
+            empty!(pol.hash_saw)
+            for i_mono in 1:pol.n_mono
+                for j in 1:3
+                    pol.trial_coord[j,i_mono] = pol.coord[j,i_mono]
                 end
-                energy = trial_energy
-                n_acc += 1
+                pol.hash_saw[pol.trial_coord[1,i_mono]*hash_base^2+pol.trial_coord[2,i_mono]*hash_base+pol.trial_coord[3,i_mono]] = i_mono
+            end
+        else
+            n_pivots += 1
+        end
+
+
+        for i_local in 1:pol.n_mono
+            mv = rand(1:4)
+            if mv==1
+                single_bead_flip!(pol.trial_coord,pol.hash_saw,pol.n_mono,hash_base)
+            elseif mv==2
+                crankshaft_180!(pol.trial_coord,pol.hash_saw,pol.n_mono,hash_base)
+            else
+                crankshaft_90_270!(pol.trial_coord,pol.hash_saw,pol.n_mono,hash_base,new_coord1,new_coord2)
             end
         end
         
-        traj.rg2[i_step] = gyration_radius_squared(pol)
-        traj.magnetization = mean(pol.spins)
+        compute_neighbours!(pol.trial_coord, pol.trial_neighbours, pol.hash_saw, hash_base, pol.n_mono)
+        trial_energy = compute_new_energy(pol,pol.trial_neighbours,pol.fields, pol.spins)
+        delta_energy = trial_energy - energy
+        acc = 0.0
+        delta_energy<=0 ? acc=1.0 : acc=exp(-delta_energy*pol.inv_temp)
+        if acc > rand()
+            for i_mono in 1:pol.n_mono
+                for j in 1:3
+                    pol.coord[j,i_mono] = pol.trial_coord[j,i_mono]
+                end
+            end
+            for i_mono in 1:pol.n_mono
+                for j in 1:7
+                    pol.neighbours[j,i_mono] = pol.trial_neighbours[j,i_mono]
+                end
+            end
+            energy = trial_energy
+            n_acc += 1
+        end
+        
+        #pre_ene = energy
+        #spins_delta = spins_MC!(pol, pol.n_mono,pol.fields,pol.spins,pol.neighbours) ## spins_MC! return the total energy variation of the accepted spin n_flips
+        #energy = compute_new_energy(pol,pol.neighbours,pol.fields,pol.spins)
+        
         energy += spins_MC!(pol, pol.n_mono,pol.fields,pol.spins,pol.neighbours) ## spins_MC! return the total energy variation of the accepted spin n_flips
+        traj.rg2[i_step] = gyration_radius_squared(pol)
+        traj.magnetization[i_step] = mean(pol.spins)
         traj.energies[i_step] = energy
+
+        if !isinteger(energy)
+            println("Non integer energy:  ", energy)
+            println(pol.coord)
+            println(pol.neighbours .- pol.trial_neighbours)
+            println(pol.trial_neighbours)
+            break
+        end
+
+        #println(energy-compute_new_energy(pol,pol.neighbours,pol.fields,pol.spins))
+        #println(energy-pre_ene - spins_delta)
 
         empty!(pol.hash_saw)
     end
     println("Fraction of accepted moves: ", n_acc/(traj.n_steps-1))
+    println("Fraction of successful pivots: ", n_pivots/(traj.n_steps-1))
 end
 
 function write_results(pol::Magnetic_polymer, traj::MC_data)
-    open("config.txt", "w") do io
-        writedlm(io, [transpose(pol.coord) pol.spins])
-    end
-    open("MC_data.txt", "w") do io
-        writedlm(io, [traj.energies, traj.magnetization, traj.rg2])
-    end
+    CSV.write("final_config.csv",  Tables.table([transpose(pol.coord) pol.spins]), writeheader=false)
+    CSV.write("MC_data.txt", Tables.table([traj.energies traj.magnetization traj.rg2]), writeheader=false)
 end
 
 

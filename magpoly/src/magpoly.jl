@@ -2,8 +2,6 @@ module magpoly
 include("structures_and_functions.jl")
 
 function simulation(n_monomers::Int, n_steps::Int)
-    #pol = Magnetic_polymer(20, 1.2, 1.0, 0.5, [], [], Array{Int}(undef, 0, 0))
-    #initialize_poly(pol)
     beta_temp = 0.4
     spins_coupling = 1.0
     alpha = 1.0
@@ -16,10 +14,9 @@ function simulation(n_monomers::Int, n_steps::Int)
     write_results(polymer, simulation_data)
     #display_polymer(polymer)
 
-    burn_in = floor(Int, 20*(n_monomers^(1.11)))
-    result1 = mean(simulation_data.re2[burn_in:end])
-    result2 = mean(simulation_data.rg2[burn_in:end])
-    return (result1,result2)
+    #burn_in = floor(Int, 20*(n_monomers^(1.11)))
+    #result = mean(simulation_data.rg2[burn_in:end])
+    #return result
 end
 
-end # module
+end # end of module
