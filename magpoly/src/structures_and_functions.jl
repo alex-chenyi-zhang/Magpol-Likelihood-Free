@@ -224,6 +224,89 @@ function single_bead_flip!(t_coo::Array{Int,2}, dic::Dict{Int, Int}, n_mono::Int
 end
 
 #########################################################################
+
+function crankshaft_180!(t_coo::Array{Int,2}, dic::Dict{Int, Int}, n_mono::Int, a::Int)
+    mono = rand(1:n_mono-3)
+    dist = 0
+    for j in 1:3
+        dist += (t_coo[j,mono+3]-t_coo[j,mono])^2
+    end
+    if dist==1
+        saw_key1 = 0
+        saw_key2 = 0
+        for j in 1:3
+            saw_key1 += (2*t_coo[j,mono] - t_coo[j,mono+1])*a^(3-j)
+            saw_key2 += (2*t_coo[j,mono+3] - t_coo[j,mono+2])*a^(3-j)
+        end
+        if !haskey(dic,saw_key1) && !haskey(dic,saw_key2)
+            delete!(dic, t_coo[1,mono+1]*a^2 + t_coo[2,mono+1]*a + t_coo[3,mono+1])
+            delete!(dic, t_coo[1,mono+2]*a^2 + t_coo[2,mono+2]*a + t_coo[3,mono+2])
+            for j in 1:3
+                t_coo[j,mono+1] = 2*t_coo[j,mono] - t_coo[j,mono+1]
+                t_coo[j,mono+2] = 2*t_coo[j,mono+3] - t_coo[j,mono+2]
+            end
+            dic[saw_key1] = mono+1
+            dic[saw_key2] = mono+2
+        end
+    end
+end
+
+#########################################################################
+
+function crankshaft_90_270!(t_coo::Array{Int,2}, dic::Dict{Int, Int}, n_mono::Int, a::Int, new_coord1::Array{Int}, new_coord2::Array{Int})
+    mono = rand(1:n_mono-3)
+    dist = 0
+    axis = 0
+    for j in 1:3
+        dist += (t_coo[j,mono+3]-t_coo[j,mono])^2
+    end
+    if dist == 1
+        orient = 0
+        for j in 1:3
+            if (t_coo[j,mono+3]-t_coo[j,mono]) != 0
+                axis = j
+                orient = t_coo[j,mono+3]-t_coo[j,mono]
+                break
+            end
+        end
+        p=0
+        t=0
+        if axis==1
+            p=2
+            t=rand((3,2))
+        elseif axis==2
+            p=6
+            t=rand((2,5))
+        elseif axis==3
+            p=3
+            t=rand((5,3))
+        else
+            println("Invalid Rotation Axis!")
+        end
+        #new_coord1 = zeros(Int,3)
+        #new_coord2 = zeros(Int,3)
+        for j in 1:3 
+            new_coord1[j] = t_coo[j,mono] + tr_signs[t,j]*(t_coo[perms[p,j],mono+1]-t_coo[perms[p,j],mono])*orient
+            new_coord2[j] = t_coo[j,mono+3] + tr_signs[t,j]*(t_coo[perms[p,j],mono+2]-t_coo[perms[p,j],mono+3])*orient
+        end
+        
+        saw_key1 = new_coord1[1]*a^2 + new_coord1[2]*a + new_coord1[3]
+        saw_key2 = new_coord2[1]*a^2 + new_coord2[2]*a + new_coord2[3]
+        if !haskey(dic,saw_key1) && !haskey(dic,saw_key2)
+            delete!(dic, t_coo[1,mono+1]*a^2 + t_coo[2,mono+1]*a + t_coo[3,mono+1])
+            delete!(dic, t_coo[1,mono+2]*a^2 + t_coo[2,mono+2]*a + t_coo[3,mono+2])
+            for j in 1:3
+                t_coo[j,mono+1] = new_coord1[j]
+                t_coo[j,mono+2] = new_coord2[j]
+            end
+            dic[saw_key1] = mono+1
+            dic[saw_key2] = mono+2
+        end
+    end 
+end
+
+
+#########################################################################
 #########################################################################
 function spins_MC!(pol::Magnetic_polymer, n_flips::Int, ff::Array{Float64}, s::Array{Int}, near::Array{Int,2})
     delta_tot = 0.0
@@ -261,6 +344,8 @@ end
 #########################################################################
 
 function MC_run!(pol::Magnetic_polymer, traj::MC_data)
+    new_coord1 = zeros(Int,3)
+    new_coord2 = zeros(Int,3)
     n_acc = 0
     n_pivots = 0
     #=
@@ -312,7 +397,14 @@ function MC_run!(pol::Magnetic_polymer, traj::MC_data)
 
 
         for i_local in 1:pol.n_mono
-            single_bead_flip!(pol.trial_coord,pol.hash_saw,pol.n_mono,hash_base)
+            mv = rand(1:4)
+            if mv==1
+                single_bead_flip!(pol.trial_coord,pol.hash_saw,pol.n_mono,hash_base)
+            elseif mv==2
+                crankshaft_180!(pol.trial_coord,pol.hash_saw,pol.n_mono,hash_base)
+            else
+                crankshaft_90_270!(pol.trial_coord,pol.hash_saw,pol.n_mono,hash_base,new_coord1,new_coord2)
+            end
         end
         
         compute_neighbours!(pol.trial_coord, pol.trial_neighbours, pol.hash_saw, hash_base, pol.n_mono)
