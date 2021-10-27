@@ -7,3 +7,5 @@ magpoly/.ipynb_checkpoints/
 config.txt
 MC_data.txt
 visualize.ipynb
+*.ipynb
+*.csv
