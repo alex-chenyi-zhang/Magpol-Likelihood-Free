@@ -343,7 +343,7 @@ end
 #########################################################################
 #########################################################################
 
-function MC_run!(pol::Magnetic_polymer, traj::MC_data)
+function MC_run!(pol::Magnetic_polymer, traj::MC_data, start::Int, finish::Int)
     new_coord1 = zeros(Int,3)
     new_coord2 = zeros(Int,3)
     n_acc = 0
@@ -362,15 +362,14 @@ function MC_run!(pol::Magnetic_polymer, traj::MC_data)
     checksaw!(1, pol, hash_base)
     compute_neighbours!(pol.coord, pol.neighbours, pol.hash_saw, hash_base, pol.n_mono)
     energy = compute_new_energy(pol,pol.neighbours,pol.fields, pol.spins)
-    println(energy)
 
-    traj.energies[1] = energy
-    traj.magnetization[1] = mean(pol.spins)
-    traj.rg2[1] = gyration_radius_squared(pol)
+    traj.energies[start] = energy
+    traj.magnetization[start] = mean(pol.spins)
+    traj.rg2[start] = gyration_radius_squared(pol)
 
     empty!(pol.hash_saw)
     
-    for i_step in 2:traj.n_steps
+    for i_step in (start+1):finish
         pivot = rand(2:pol.n_mono-1)
         p_move = rand(1:47)
         if i_step%10000 == 0
@@ -449,9 +448,15 @@ function MC_run!(pol::Magnetic_polymer, traj::MC_data)
 
         empty!(pol.hash_saw)
     end
-    println("Fraction of accepted moves: ", n_acc/(traj.n_steps-1))
-    println("Fraction of successful pivots: ", n_pivots/(traj.n_steps-1))
+    println("Fraction of accepted moves: ", n_acc/(finish-1))
+    println("Fraction of successful pivots: ", n_pivots/(finish-1))
 end
+
+function MC_run!(pol::Magnetic_polymer, traj::MC_data)
+    MC_run!(pol, traj, 1, traj.n_steps)
+end
+
+
 
 function write_results(pol::Magnetic_polymer, traj::MC_data)
     CSV.write("final_config.csv",  Tables.table([transpose(pol.coord) pol.spins]), writeheader=false)
@@ -459,5 +464,12 @@ function write_results(pol::Magnetic_polymer, traj::MC_data)
 end
 
 
+function simulation(n_monomers::Int, n_steps::Int, beta_temp::Float64, spins_coupling::Float64, alpha::Float64)
+    simulation_data = MC_data(n_steps)
+    polymer = Magnetic_polymer(n_monomers, beta_temp, spins_coupling, alpha)
 
+    initialize_poly!(polymer)
+    MC_run!(polymer, simulation_data)
+    write_results(polymer, simulation_data)
+end
 
