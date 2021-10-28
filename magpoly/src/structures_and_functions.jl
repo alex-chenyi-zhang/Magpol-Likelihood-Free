@@ -1,5 +1,4 @@
-using Random, Distributions#, DelimitedFiles
-using CSV, Tables
+using Random, Distributions, DelimitedFiles, CSV
 Random.seed!()
 
 # Here I define the global quantities used by all pivot MCMC run which are the pivot moves
@@ -56,6 +55,20 @@ function initialize_poly!(poly::Magnetic_polymer)
         end
     end
 end
+
+#The following method of the "initialize_poly!()" function allows initialization from file
+function initialize_poly!(poly::Magnetic_polymer, file_name::String)
+    io = open(file_name, "r")
+    data = readdlm(io,Int64)
+    close(io)
+    for i_mono in 1:poly.n_mono
+        for j in 1:3
+            poly.coord[j,i_mono] = data[i_mono,j]
+        end
+        poly.spins[i_mono] = data[i_mono, 4]
+    end
+end
+
 
 function display_polymer(polymer::Magnetic_polymer)
     println("n_mono: $(polymer.n_mono)")
@@ -435,6 +448,8 @@ function MC_run!(pol::Magnetic_polymer, traj::MC_data, start::Int, finish::Int)
         traj.magnetization[i_step] = mean(pol.spins)
         traj.energies[i_step] = energy
 
+        # This next if ... end can be removed. I kept as a sanity check in an early stage 
+        # when I had problems with the computation of the nearest neighbours
         if !isinteger(energy)
             println("Non integer energy:  ", energy)
             println(pol.coord)
@@ -457,19 +472,56 @@ function MC_run!(pol::Magnetic_polymer, traj::MC_data)
 end
 
 
-
 function write_results(pol::Magnetic_polymer, traj::MC_data)
-    CSV.write("final_config.csv",  Tables.table([transpose(pol.coord) pol.spins]), writeheader=false)
-    CSV.write("MC_data.txt", Tables.table([traj.energies traj.magnetization traj.rg2]), writeheader=false)
+    open("final_config.txt", "w") do io
+        writedlm(io, [transpose(pol.coord) pol.spins])
+    end
+    open("MC_data.txt", "w") do io
+        writedlm(io, [traj.energies traj.magnetization traj.rg2])
+    end
 end
 
 
-function simulation(n_monomers::Int, n_steps::Int, beta_temp::Float64, spins_coupling::Float64, alpha::Float64)
-    simulation_data = MC_data(n_steps)
-    polymer = Magnetic_polymer(n_monomers, beta_temp, spins_coupling, alpha)
+function simulation(input::String)
+    # First read parameters from input
+    io = open("input.txt", "r")
+    n_mono = 1
+    n_steps = 1
+    beta_temp = 1.0
+    spins_coupling = 0.0
+    alpha = 1.0
+    conf_file = ""
+    from_file = false
+    while ! eof(io)
+        line = split(readline(io))
+        if line[1] == "n_mono"
+            n_mono = parse(Int, line[2])
+        elseif line[1] == "n_steps"
+            n_steps = parse(Int, line[2])
+        elseif line[1] == "spins_coupling"
+            spins_coupling = parse(Float64, line[2])
+        elseif line[1] == "alpha"
+            alpha = parse(Float64, line[2])
+        elseif line[1] == "inverse_temperature"
+            beta_temp = parse(Float64, line[2])
+        elseif line[1] == "initialize_from_files"
+            from_file = parse(Bool, line[2])
+        elseif line[1] == "conf_file"
+            conf_file = String(line[2])
+        end
+    end
+    
+    close(io)
 
-    initialize_poly!(polymer)
+    simulation_data = MC_data(n_steps)
+    polymer = Magnetic_polymer(n_mono, beta_temp, spins_coupling, alpha)
+    
+    if from_file
+        initialize_poly!(polymer, conf_file)
+    else
+        initialize_poly!(polymer)
+    end
+    
     MC_run!(polymer, simulation_data)
     write_results(polymer, simulation_data)
 end
-
