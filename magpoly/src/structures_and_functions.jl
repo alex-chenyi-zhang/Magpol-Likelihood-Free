@@ -357,6 +357,11 @@ end
 #########################################################################
 
 function MC_run!(pol::Magnetic_polymer, traj::MC_data, start::Int, finish::Int)
+    for i_mono in 1:pol.n_mono
+        for j in 1:3
+            pol.trial_coord[j,i_mono] = pol.coord[j,i_mono]
+        end
+    end 
     new_coord1 = zeros(Int,3)
     new_coord2 = zeros(Int,3)
     n_acc = 0
@@ -463,8 +468,8 @@ function MC_run!(pol::Magnetic_polymer, traj::MC_data, start::Int, finish::Int)
 
         empty!(pol.hash_saw)
     end
-    println("Fraction of accepted moves: ", n_acc/(finish-1))
-    println("Fraction of successful pivots: ", n_pivots/(finish-1))
+    #println("Fraction of accepted moves: ", n_acc/(finish-1))
+    #println("Fraction of successful pivots: ", n_pivots/(finish-1))
 end
 
 function MC_run!(pol::Magnetic_polymer, traj::MC_data)
@@ -473,13 +478,43 @@ end
 
 
 function write_results(pol::Magnetic_polymer, traj::MC_data)
-    open("final_config.txt", "w") do io
+    !isdir("simulation_data") && mkdir("simulation_data")
+    
+    open("simulation_data/final_config_$(pol.n_mono)_$(pol.inv_temp).txt", "w") do io
         writedlm(io, [transpose(pol.coord) pol.spins])
     end
-    open("MC_data.txt", "w") do io
+    open("simulation_data/MC_data_$(pol.n_mono)_$(pol.inv_temp).txt", "w") do io
         writedlm(io, [traj.energies traj.magnetization traj.rg2])
     end
 end
+
+function write_results(pol::Magnetic_polymer)
+    !isdir("simulation_data") && mkdir("simulation_data")
+
+    open("simulation_data/final_config_$(pol.n_mono)_$(pol.inv_temp).txt", "w") do io
+        writedlm(io, [transpose(pol.coord) pol.spins])
+    end
+end
+
+#########################################################################
+#########################################################################
+
+function simulation(n_mono::Int, n_steps::Int ,beta_temp::Float64, spins_coupling::Float64, alpha::Float64)
+    simulation_data = MC_data(n_steps)
+    polymer = Magnetic_polymer(n_mono, beta_temp, spins_coupling, alpha)
+    initialize_poly!(polymer)
+    MC_run!(polymer, simulation_data)
+    write_results(polymer, simulation_data)
+end
+
+function simulation(n_mono::Int, n_steps::Int ,beta_temp::Float64, spins_coupling::Float64, alpha::Float64, conf_file::String)
+    simulation_data = MC_data(n_steps)
+    polymer = Magnetic_polymer(n_mono, beta_temp, spins_coupling, alpha)
+    initialize_poly!(polymer, conf_file)
+    MC_run!(polymer, simulation_data)
+    write_results(polymer, simulation_data)
+end
+
 
 
 function simulation(input::String)

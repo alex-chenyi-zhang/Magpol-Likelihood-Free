@@ -4,8 +4,10 @@
 # environment.
 Manifest.toml
 magpoly/.ipynb_checkpoints/
-config.txt
+magpoly/simulation_data/
+final_config*.txt
+final_config.txt
+MC_data*.txt
 MC_data.txt
-visualize.ipynb
 *.ipynb
 *.csv

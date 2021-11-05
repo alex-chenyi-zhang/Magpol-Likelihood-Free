@@ -1,8 +1,7 @@
-n_mono 200
-n_steps 10
+n_mono 3000
+n_steps 300000
 spins_coupling 1.0
 alpha 1.0
-inverse_temperature 1.0
-initialize_from_files true
-conf_file final_config.txt_config.txt
-pinco pallinollino
+inverse_temperature 0.3
+initialize_from_files false
+conf_file final_config.txt
