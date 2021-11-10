@@ -1,33 +1,83 @@
 module magpoly
 include("structures_and_functions.jl")
 
+#############################################################################################################
+#############################################################################################################
+
+"""
+    MC_run!(pol::Magnetic_polymer, traj::MC_data, start::Int, finish::Int)
+Runs a MC simulation of the magnetic polymer by indexing the monte carlo 
+steps from 'start' to 'finish'. Modifications are done on the pol::Magnetic_polymer
+and the data is stored in the traj::MC_data at the positions from 'start' to 'finish'
+"""
 function MC_run!(pol::Magnetic_polymer, traj::MC_data, start::Int, finish::Int)
     MC_run_base!(pol, traj, start, finish)
 end
 
+
+
+"""
+    MC_run!(pol::Magnetic_polymer, traj::MC_data)
+Same thins as MC_run!(pol::Magnetic_polymer, traj::MC_data, start::Int, finish::Int)
+but start and finish are defaulted to 1 and n_steps
+"""
 function MC_run!(pol::Magnetic_polymer, traj::MC_data)
     MC_run_base!(pol, traj, 1, traj.n_steps)
 end
 
+
+
+"""
+    MC_run!(pol::Magnetic_polymer, traj::MC_data, start::Int, finish::Int, spins_configs::Matrix{Int}, sample_lag::Int)
+Still performs the monte carlo simulation but one every 'sample_lag' steps the spins configuration is stored. 
+The configurations are stored in spins_configs::Matrix{Int}
+"""
 function MC_run!(pol::Magnetic_polymer, traj::MC_data, start::Int, finish::Int, spins_configs::Matrix{Int}, sample_lag::Int)
     MC_run_save!(pol, traj, start, finish, spins_configs, sample_lag)
 end
 
+
+
+"""
+    MC_run!(pol::Magnetic_polymer, traj::MC_data, spins_configs::Matrix{Int}, sample_lag::Int)
+Monte Carlo that saves configurations as above but defaults starting and ending steps to 1 and n_steps
+"""
 function MC_run!(pol::Magnetic_polymer, traj::MC_data, spins_configs::Matrix{Int}, sample_lag::Int)
     MC_run_save!(pol, traj, 1, traj.n_steps, spins_configs, sample_lag)
 end
 
+
+
+#############################################################################################################
+#############################################################################################################
+
+"""
+    MMC_run!(polymers::Array{Magnetic_polymer}, trajs::Array{MC_data},
+    n_strides::Int, stride::Int, inv_temps::Array{Float64})
+Performs simulation with Multiple Markov Chains (MMC) attempting a swap between Chains
+at two contiguous temperatures every 'stride' steps. The number of attempet
+swaps is 'n_strides' and the values of the inverse temperatures of the 
+different Markov chains are in the array 'inv_temps'
+"""
 function MMC_run!(polymers::Array{Magnetic_polymer}, trajs::Array{MC_data},
     n_strides::Int, stride::Int, inv_temps::Array{Float64})
     MMC_run_base!(polymers, trajs, n_strides ,stride, inv_temps)
 end
 
+
+
+"""
+    MMC_run!(polymers::Array{Magnetic_polymer}, trajs::Array{MC_data},
+    n_strides::Int, stride::Int, inv_temps::Array{Float64}, spins_configs::Matrix{Int}, sample_lag::Int)
+Same thing as above but the spins configurations are saved once every 'sample_lag' steps
+"""
 function MMC_run!(polymers::Array{Magnetic_polymer}, trajs::Array{MC_data},
     n_strides::Int, stride::Int, inv_temps::Array{Float64}, spins_configs::Matrix{Int}, sample_lag::Int)
     MMC_run_save!(polymers, trajs, n_strides ,stride, inv_temps,spins_configs,sample_lag)
 end
 
-
+#############################################################################################################
+#############################################################################################################
 
 function write_results(pol::Magnetic_polymer, traj::MC_data)
     !isdir("simulation_data") && mkdir("simulation_data")
@@ -48,8 +98,8 @@ function write_results(pol::Magnetic_polymer)
     end
 end
 
-###################################################################################
-###################################################################################
+#############################################################################################################
+#############################################################################################################
 
 function simulation(n_mono::Int, n_steps::Int ,beta_temp::Float64, spins_coupling::Float64, alpha::Float64)
     simulation_data = MC_data(n_steps)
@@ -113,6 +163,8 @@ function simulation(input::String)
     write_results(polymer, simulation_data)
 end
 
+#############################################################################################################
+#############################################################################################################
 
 function MMC_simulation(n_mono::Int, n_strides::Int, stride::Int)
     spins_coupling = 1.0
