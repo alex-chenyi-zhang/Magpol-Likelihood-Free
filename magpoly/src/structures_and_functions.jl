@@ -76,9 +76,11 @@ function initialize_poly!(poly::Magnetic_polymer, file_name::String)
     end
 end
 
-function initialize_fields!(poly::Magnetic_polymer, ff::Array{Float64})
-    for i_mono in 1:poly.n_mono
-        poly.fields[i_mono] = ff[i_mono]
+function set_fields!(polymers::Array{Magnetic_polymer}, ff::Array{Float64})
+    for polymer in polymers
+        for i_mono in 1:polymer.n_mono
+            polymer.fields[i_mono] = ff[i_mono]
+        end
     end
 end
 
@@ -450,13 +452,13 @@ function MC_run_base!(pol::Magnetic_polymer, traj::MC_data, start::Int, finish::
 
         # This next if ... end can be removed. I kept as a sanity check in an early stage 
         # when I had problems with the computation of the nearest neighbours
-        if !isinteger(energy)
+        #=if !isinteger(energy)
             println("Non integer energy:  ", energy)
             println(pol.coord)
             println(pol.neighbours .- pol.trial_neighbours)
             println(pol.trial_neighbours)
             break
-        end
+        end=#
 
         empty!(pol.hash_saw)
     end
@@ -471,7 +473,7 @@ end
 #########################################################################
 
 # This function is like MC_run_base! but also save configurations
-function MC_run_save!(pol::Magnetic_polymer, traj::MC_data, start::Int, finish::Int, spins_configs::Matrix{Int}, sample_lag::Int)
+function MC_run_save!(pol::Magnetic_polymer, traj::MC_data, start::Int, finish::Int, spins_configs::Matrix{Int}, sample_lag::Int, n_samples::Int)
     for i_mono in 1:pol.n_mono
         for j in 1:3
             pol.trial_coord[j,i_mono] = pol.coord[j,i_mono]
@@ -494,7 +496,7 @@ function MC_run_save!(pol::Magnetic_polymer, traj::MC_data, start::Int, finish::
 
     empty!(pol.hash_saw)
     
-    for i_step in (start+1):finish
+    for i_step in (start+1):min(finish,sample_lag*n_samples)
         pivot = rand(2:pol.n_mono-1)
         p_move = rand(1:47)
         if i_step%10000 == 0
@@ -557,13 +559,13 @@ function MC_run_save!(pol::Magnetic_polymer, traj::MC_data, start::Int, finish::
         traj.magnetization[i_step] = mean(pol.spins)
         traj.energies[i_step] = energy
 
-        if !isinteger(energy)
+        #=if !isinteger(energy)
             println("Non integer energy:  ", energy)
             println(pol.coord)
             println(pol.neighbours .- pol.trial_neighbours)
             println(pol.trial_neighbours)
             break
-        end
+        end=#
         empty!(pol.hash_saw)
         if i_step%sample_lag == 0
             i_sample = div(i_step,sample_lag)
@@ -612,15 +614,17 @@ function MMC_run_base!(polymers::Array{Magnetic_polymer}, trajs::Array{MC_data},
 end
 
 function MMC_run_save!(polymers::Array{Magnetic_polymer}, trajs::Array{MC_data},
-                    n_strides::Int, stride::Int, inv_temps::Array{Float64}, spins_configs::Matrix{Int}, sample_lag::Int)
+                    n_strides::Int, stride::Int, inv_temps::Array{Float64}, spins_configs::Matrix{Int}, sample_lag::Int, n_samples::Int)
     n_temps = length(inv_temps)
     accepted_swaps = 0
     temp_coord = zeros(Int,3)
 
     for i_strides in 1:n_strides
-        for i_temp in 1:n_temps
-            # actually the next line is the only difference between this function and MMC_run_base!()
-            MC_run!(polymers[i_temp], trajs[i_temp],(i_strides-1)*stride+1,i_strides*stride, spins_configs,sample_lag)
+        MC_run!(polymers[1], trajs[1],(i_strides-1)*stride+1,i_strides*stride, spins_configs,sample_lag, n_samples)
+        # Only the lowest temperature is the system we're using for our likelihood approx
+        # the chains at higher temps are only used to "fluidify" the chain of interest
+        for i_temp in 2:n_temps
+            MC_run!(polymers[i_temp], trajs[i_temp],(i_strides-1)*stride+1,i_strides*stride, sample_lag, n_samples)
         end
 
         swap = rand(1:n_temps-1)
@@ -641,5 +645,5 @@ function MMC_run_save!(polymers::Array{Magnetic_polymer}, trajs::Array{MC_data},
             accepted_swaps += 1
         end
     end
-    println("Accepted_swaps: ", accepted_swaps)
+    #println("Accepted_swaps: ", accepted_swaps)
 end

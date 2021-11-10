@@ -27,13 +27,18 @@ end
 
 
 
+function MC_run!(pol::Magnetic_polymer, traj::MC_data, start::Int, finish::Int, sample_lag::Int, n_samples::Int)
+    MC_run_base!(pol, traj, start, min(finish, sample_lag*n_samples))
+end
+
+
 """
     MC_run!(pol::Magnetic_polymer, traj::MC_data, start::Int, finish::Int, spins_configs::Matrix{Int}, sample_lag::Int)
 Still performs the monte carlo simulation but one every 'sample_lag' steps the spins configuration is stored. 
 The configurations are stored in spins_configs::Matrix{Int}
 """
-function MC_run!(pol::Magnetic_polymer, traj::MC_data, start::Int, finish::Int, spins_configs::Matrix{Int}, sample_lag::Int)
-    MC_run_save!(pol, traj, start, finish, spins_configs, sample_lag)
+function MC_run!(pol::Magnetic_polymer, traj::MC_data, start::Int, finish::Int, spins_configs::Matrix{Int}, sample_lag::Int, n_samples::Int)
+    MC_run_save!(pol, traj, start, finish, spins_configs, sample_lag, n_samples)
 end
 
 
@@ -42,8 +47,8 @@ end
     MC_run!(pol::Magnetic_polymer, traj::MC_data, spins_configs::Matrix{Int}, sample_lag::Int)
 Monte Carlo that saves configurations as above but defaults starting and ending steps to 1 and n_steps
 """
-function MC_run!(pol::Magnetic_polymer, traj::MC_data, spins_configs::Matrix{Int}, sample_lag::Int)
-    MC_run_save!(pol, traj, 1, traj.n_steps, spins_configs, sample_lag)
+function MC_run!(pol::Magnetic_polymer, traj::MC_data, spins_configs::Matrix{Int}, sample_lag::Int, n_samples::Int)
+    MC_run_save!(pol, traj, 1, traj.n_steps, spins_configs, sample_lag, n_samples)
 end
 
 
@@ -72,9 +77,11 @@ end
 Same thing as above but the spins configurations are saved once every 'sample_lag' steps
 """
 function MMC_run!(polymers::Array{Magnetic_polymer}, trajs::Array{MC_data},
-    n_strides::Int, stride::Int, inv_temps::Array{Float64}, spins_configs::Matrix{Int}, sample_lag::Int)
-    MMC_run_save!(polymers, trajs, n_strides ,stride, inv_temps,spins_configs,sample_lag)
+    n_strides::Int, stride::Int, inv_temps::Array{Float64}, spins_configs::Matrix{Int}, sample_lag::Int,n_samples::Int)
+    MMC_run_save!(polymers, trajs, n_strides ,stride, inv_temps,spins_configs,sample_lag,n_samples)
 end
+
+
 
 #############################################################################################################
 #############################################################################################################
