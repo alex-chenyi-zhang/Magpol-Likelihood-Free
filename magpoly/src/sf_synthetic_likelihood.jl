@@ -56,7 +56,7 @@ function lag_p_autocovariance(vect::Array{Int}, p::Int)
 end
 
 
-function compute_summary_stats!(ss::Matrix{Float64}, sp_conf::Matrix{Int}, feats::Array{Float64})
+function compute_summary_stats!(ss::Matrix{Float64}, sp_conf::Matrix{Int}, feats::Matrix{Float64})
     n_s = size(ss,2) #number of samples 
     n_m = size(sp_conf,1)
     for i_sample in 1:n_s
@@ -66,19 +66,19 @@ function compute_summary_stats!(ss::Matrix{Float64}, sp_conf::Matrix{Int}, feats
         ss[2,i_sample]=0
         for i_m in 1:n_m
             ss[1,i_sample] += sp_conf[i_m,i_sample]
-            ss[2,i_sample] += sp_conf[i_m,i_sample]*feats[i_m]
+            ss[2,i_sample] += sp_conf[i_m,i_sample]*feats[i_m,1]
+            ss[3,i_sample] += sp_conf[i_m,i_sample]*feats[i_m,2]
         end
         ss[1,i_sample] = ss[1,i_sample]/n_m
         ss[2,i_sample] = ss[2,i_sample]/n_m
-        ss[3,i_sample] = lag_p_autocovariance(sp_conf[:,i_sample], 3)
+        ss[3,i_sample] = ss[3,i_sample]/n_m
+        ss[4,i_sample] = lag_p_autocovariance(sp_conf[:,i_sample], 3)
     end
 end
 
 
 function log_synth_likelihood(mat::Matrix{Float64}, avg::Array{Float64}, data::Array{Float64})
     s = -0.5*(avg .- data)'*inv(mat)*(avg .- data) -0.5*log(abs(det(mat)))
-    #println(log(abs(det(mat))))
-    #println((avg .- data)'*inv(mat)*(avg .- data))
     return s
 end
 
@@ -87,15 +87,25 @@ end
 
 
 ## for now this is just the backbone of the function to carry out the likelihood-free inference task
-function synthetic_likelihood_polymer(n_samples::Int, n_params::Int, sample_lag::Int, initial_weight::Float64, features_file::String)
+function synthetic_likelihood_polymer(n_samples::Int, sample_lag::Int, n_params::Int, initial_weights::Array{Float64}, features_file::String)
     io = open(features_file, "r")
     features = readdlm(io,Float64)
     close(io)
     n_mono = size(features, 1)
+    n_feats = size(features, 2)
 
-    data = [0.662818, -0.0552691, -0.0162029]
+    #data = [0.6036745406824147, -0.3997000374953125, -0.3992614680299055, 0.06693990928046743] # 2, -1.5
+
+    io = open("data_file.txt", "r")
+    data = readdlm(io,Float64)
+    close(io)
+    println(data,"\n\n")
+    n_data = size(data, 1)
+    n_ss = size(data, 2) # number of summary statistics
+    println(n_ss, "\n\n")
+
     accepted_moves = 0
-    stride = 50
+    stride = 100
     n_strides = cld(n_samples*sample_lag, stride) # integer ceiling of the division
     spins_coupling = 1.0
     alpha = 0.5
@@ -103,8 +113,7 @@ function synthetic_likelihood_polymer(n_samples::Int, n_params::Int, sample_lag:
     n_temps = length(inv_temps)
 
     spins_configs = zeros(Int, n_mono, n_samples)
-    cov_mat = zeros(3,3)
-    inv_cov_mat = zeros(3,3)
+    
     
     
     polymers = Array{mp.Magnetic_polymer}(undef, n_temps)
@@ -112,57 +121,90 @@ function synthetic_likelihood_polymer(n_samples::Int, n_params::Int, sample_lag:
     for i_temp in 1:n_temps
         polymers[i_temp] = mp.Magnetic_polymer(n_mono, inv_temps[i_temp], spins_coupling, alpha)
         trajs[i_temp] = mp.MC_data(n_strides*stride)
-        mp.initialize_poly!(polymers[i_temp])#,"simulation_data/final_config_$(n_mono)_$(inv_temps[i_temp]).txt")
+        if isfile("simulation_data/final_config_$(n_mono)_$(inv_temps[1]).txt")
+            mp.initialize_poly!(polymers[i_temp],"simulation_data/final_config_$(n_mono)_$(inv_temps[1]).txt")
+        else
+            mp.initialize_poly!(polymers[i_temp])
+        end
     end 
 
-    n_ss = 3 #number of summary statistics
-    delta_w = 0.3
-    param_series = zeros(n_params)
+    cov_mat = zeros(n_ss,n_ss)
+    #inv_cov_mat = zeros(3,3)
+    delta_w = 0.1
+    param_series = zeros(2,n_params)
     SL_series = zeros(n_params)
     ss_mean_series = zeros(n_ss, n_params)
     #ss_cov_determinant_series = zeros(n_params)
     summary_stats = zeros(n_ss, n_samples)
-    weight = initial_weight
+    weights = zeros(2)
+    trial_weights = zeros(2)
+    weights .= initial_weights
 
-    mp.set_fields!(polymers, weight .* features)
+    fields = zeros(n_mono)
+    for i in 1:n_feats
+        fields .+= features[:,i] .* weights[i]
+    end
+
+    mp.set_fields!(polymers, fields)
     mp.MMC_run!(polymers,trajs,n_strides,stride,inv_temps,spins_configs,sample_lag,n_samples)
     compute_summary_stats!(summary_stats, spins_configs, features)
     ss_mean_series[:,1] .= vec(mean(summary_stats, dims=2))
     cov_mat .= cov(summary_stats, dims=2)
-    #determ = det(cov_mat)
-    #inv_cov_mat = inv(cov_mat)
-    syn_like = log_synth_likelihood(cov_mat, ss_mean_series[:,1], data)
-    param_series[1] = weight
+
+    syn_like = 0.0
+    for i_data in 1:n_data
+        syn_like += log_synth_likelihood(cov_mat, ss_mean_series[:,1], data[i_data,:])
+    end
+    
+    param_series[1,1] = weights[1]
+    param_series[2,1] = weights[2]
     SL_series[1] = syn_like 
     w_acceptance = 0.0
-    #println(size(vec(mean(summary_stats, dims=2))))
-    #println(size(ss_mean_series[:,1]))
-    #println(size(ss_mean_series[:,1] .- data))
-    #println(size((ss_mean_series[:,1] .- data)'*inv(cov_mat)*(ss_mean_series[:,1] .- data)))
     
     for i_param in 2:n_params
-        trial_weight = weight + (2*rand()-1)*delta_w
-        mp.set_fields!(polymers, trial_weight .* features)
+        #=trial_weights .= weights
+        if rand((1,2))==1
+            trial_weights[1] += (2*rand()-1)*delta_w
+        else
+            trial_weights[2] += (2*rand()-1)*delta_w
+        end=#
+            
+        trial_weights .= weights .+ (2 .* rand(2) .-1) .*delta_w
+        
+        
+        fields = zeros(n_mono)
+        for i in 1:n_feats
+            fields .+= features[:,i] .* trial_weights[i]
+        end
+        mp.set_fields!(polymers, fields)
         mp.MMC_run!(polymers,trajs,n_strides,stride,inv_temps,spins_configs,sample_lag,n_samples)
         compute_summary_stats!(summary_stats, spins_configs, features)
 
         #println(mean(summary_stats, dims=2))
         ss_mean_series[:,i_param] .= vec(mean(summary_stats, dims=2))
         cov_mat .= cov(summary_stats, dims=2)
-        trial_syn_like = log_synth_likelihood(cov_mat, ss_mean_series[:,i_param], data)
+
+        trial_syn_like = 0.0
+        for i_data in 1:n_data
+            trial_syn_like += log_synth_likelihood(cov_mat, ss_mean_series[:,i_param], data[i_data,:])
+        end
+        
         delta_syn_like = trial_syn_like -syn_like
         delta_syn_like>=0 ? w_acceptance=1 : w_acceptance=exp(delta_syn_like)
-        if i_param%100 == 0
-            println(i_param, "\n weight = ", weight, "\n accept = ",w_acceptance, "\n syn_like = ", syn_like)
-            println("trial_weight: ",trial_weight)
+        if i_param%10 == 0
+            println(i_param)
+            println("w1: ",weights[1]," ---> ",trial_weights[1])
+            println("w2: ",weights[2]," ---> ",trial_weights[2])
             println("delta_syn_like: ", delta_syn_like)
+            println("acceptance: ", w_acceptance)
         end
         if w_acceptance > rand()
-            weight = trial_weight
+            weights .= trial_weights
             syn_like = trial_syn_like
             accepted_moves += 1
         end
-        param_series[i_param] = weight
+        param_series[1,i_param] = weights[1]
+        param_series[2,i_param] = weights[2]
         SL_series[i_param] = syn_like
     end
 
@@ -174,5 +216,57 @@ function synthetic_likelihood_polymer(n_samples::Int, n_params::Int, sample_lag:
     open("SL_data/syn_likes.txt", "w") do io
         writedlm(io, SL_series)
     end
+    mp.write_results(polymers[1],trajs[1])
 
 end
+
+#####################################################################################
+#####################################################################################
+
+function generate_data(features_file::String, n_strides::Int, weights::Array{Float64})
+    io = open(features_file, "r")
+    features = readdlm(io,Float64)
+    close(io)
+    n_mono = size(features, 1)
+    n_feats = size(features, 2)
+
+    spins_coupling = 1.0
+    alpha = 0.5
+    inv_temps = [1.0, 0.9, 0.8, 0.74, 0.65, 0.62, 0.6, 0.55, 0.5, 0.4]
+    n_temps = length(inv_temps)
+    stride = 500
+
+    polymers = Array{mp.Magnetic_polymer}(undef, n_temps)
+    trajs = Array{mp.MC_data}(undef, n_temps)
+    for i_temp in 1:n_temps
+        polymers[i_temp] = mp.Magnetic_polymer(n_mono, inv_temps[i_temp], spins_coupling, alpha)
+        trajs[i_temp] = mp.MC_data(n_strides*stride)
+        if isfile("simulation_data/final_config_$(n_mono)_$(inv_temps[1]).txt")
+            mp.initialize_poly!(polymers[i_temp],"simulation_data/final_config_$(n_mono)_$(inv_temps[1]).txt")
+        else
+            mp.initialize_poly!(polymers[i_temp])
+        end
+    end 
+
+    fields = zeros(n_mono)
+    for i in 1:n_feats
+        fields .+= features[:,i] .* weights[i]
+    end
+    mp.set_fields!(polymers, fields)
+
+    mp.MMC_run!(polymers, trajs, n_strides, stride, inv_temps)
+    mp.MMC_run!(polymers, trajs, n_strides, stride, inv_temps)
+    mp.MMC_run!(polymers, trajs, n_strides, stride, inv_temps)
+    
+    n_data = 10
+    summary_stats = zeros(4,n_data)
+    spins_conf = zeros(Int,n_mono,n_data)
+    for i_data in 1:n_data
+        mp.MMC_run!(polymers, trajs, n_strides, stride, inv_temps)
+        #mp.write_results(polymers[1],trajs[1])
+        spins_conf[:,i_data] .= polymers[1].spins
+    end
+    compute_summary_stats!(summary_stats,spins_conf,features)
+    println(summary_stats)
+end
+

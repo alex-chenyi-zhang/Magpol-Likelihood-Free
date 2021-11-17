@@ -1,4 +1,4 @@
-using Random, Distributions, DelimitedFiles, CSV
+using Random, Distributions, DelimitedFiles
 Random.seed!()
 
 # Here I define the global quantities used by all pivot MCMC run which are the pivot moves
