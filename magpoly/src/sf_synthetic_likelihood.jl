@@ -180,7 +180,6 @@ function synthetic_likelihood_polymer(n_samples::Int, sample_lag::Int, n_params:
         mp.MMC_run!(polymers,trajs,n_strides,stride,inv_temps,spins_configs,sample_lag,n_samples)
         compute_summary_stats!(summary_stats, spins_configs, features)
 
-        #println(mean(summary_stats, dims=2))
         ss_mean_series[:,i_param] .= vec(mean(summary_stats, dims=2))
         cov_mat .= cov(summary_stats, dims=2)
 

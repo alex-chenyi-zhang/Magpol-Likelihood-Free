@@ -495,6 +495,13 @@ function MC_run_save!(pol::Magnetic_polymer, traj::MC_data, start::Int, finish::
     traj.rg2[start] = gyration_radius_squared(pol)
 
     empty!(pol.hash_saw)
+
+    if start%sample_lag == 0
+        i_sample = div(start,sample_lag)
+        for i_mono in 1:pol.n_mono
+            spins_configs[i_mono, i_sample]  = pol.spins[i_mono]
+        end
+    end
     
     for i_step in (start+1):min(finish,sample_lag*n_samples)
         pivot = rand(2:pol.n_mono-1)
