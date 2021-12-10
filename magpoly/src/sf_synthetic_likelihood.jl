@@ -97,7 +97,7 @@ function synthetic_likelihood_polymer(n_samples::Int, sample_lag::Int, n_params:
     #data = [0.6036745406824147, -0.3997000374953125, -0.3992614680299055, 0.06693990928046743] # 2, -1.5
 
     io = open("data_file.txt", "r")
-    data = readdlm(io,Float64)
+    data = readdlm(io,Float64; header=true)[1][1:end,:]
     close(io)
     println(data,"\n\n")
     n_data = size(data, 1)
@@ -130,7 +130,7 @@ function synthetic_likelihood_polymer(n_samples::Int, sample_lag::Int, n_params:
 
     cov_mat = zeros(n_ss,n_ss)
     #inv_cov_mat = zeros(3,3)
-    delta_w = 0.1
+    delta_w = 0.05
     param_series = zeros(2,n_params)
     SL_series = zeros(n_params)
     ss_mean_series = zeros(n_ss, n_params)
@@ -190,7 +190,7 @@ function synthetic_likelihood_polymer(n_samples::Int, sample_lag::Int, n_params:
         
         delta_syn_like = trial_syn_like -syn_like
         delta_syn_like>=0 ? w_acceptance=1 : w_acceptance=exp(delta_syn_like)
-        if i_param%10 == 0
+        if i_param%100 == 0
             println(i_param)
             println("w1: ",weights[1]," ---> ",trial_weights[1])
             println("w2: ",weights[2]," ---> ",trial_weights[2])
@@ -216,6 +216,149 @@ function synthetic_likelihood_polymer(n_samples::Int, sample_lag::Int, n_params:
         writedlm(io, SL_series)
     end
     mp.write_results(polymers[1],trajs[1])
+
+end
+
+
+#####################################################################################
+#####################################################################################
+
+# AMHI: Approximate metropolis hastings inference
+function amhi_polymer(n_samples::Int, sample_lag::Int, n_params::Int, initial_weights::Array{Float64}, features_file::String)
+    # Read features from file
+    io = open(features_file, "r")
+    features = readdlm(io,Float64)
+    close(io)
+    n_mono = size(features, 1)
+    n_feats = size(features, 2)
+
+    # Read generated data. In this algo they're not summary stats but the full data!
+    io = open("saw_conf_data.txt","r")
+    data_spins = readdlm(io, Int64; header=true)[1][1:end,:]
+    close(io)
+    n_data = size(data_spins, 1)
+    println(n_mono)
+    println(n_data)
+    println(typeof(data_spins))
+
+
+    accepted_moves = 0
+    stride = 100
+    n_strides = cld(n_samples*sample_lag, stride) # integer ceiling of the division
+    spins_coupling = 1.0
+    alpha = 0.5
+    inv_temps = [1.0, 0.9, 0.8, 0.74, 0.65, 0.62, 0.6, 0.55, 0.5, 0.4]
+    n_temps = length(inv_temps)
+
+    spins_configs = zeros(Int, n_mono, n_samples) # where you store the generated data
+    
+    ########################################################### Initialize some quantitites in this section
+    polymers = Array{mp.Magnetic_polymer}(undef, n_temps)
+    trajs = Array{mp.MC_data}(undef, n_temps)
+    for i_temp in 1:n_temps
+        polymers[i_temp] = mp.Magnetic_polymer(n_mono, inv_temps[i_temp], spins_coupling, alpha)
+        trajs[i_temp] = mp.MC_data(n_strides*stride)
+        if isfile("simulation_data/final_config_$(n_mono)_$(inv_temps[1]).txt")
+            mp.initialize_poly!(polymers[i_temp],"simulation_data/final_config_$(n_mono)_$(inv_temps[1]).txt")
+        else
+            mp.initialize_poly!(polymers[i_temp])
+        end
+    end 
+
+    
+    delta_w = 0.05
+    param_series = zeros(n_feats,n_params)
+    avg_spins = zeros(n_mono, n_samples)
+    
+    weights = zeros(2)
+    trial_weights = zeros(2)
+    weights .= initial_weights
+
+    fields = zeros(n_mono)
+    for i in 1:n_feats
+        fields .+= features[:,i] .* weights[i]
+    end
+    #############################################################
+   
+    param_series[1,1] = weights[1]
+    param_series[2,1] = weights[2]
+    w_acceptance = 0.0
+
+    energy = 0
+    for i_data in 1:n_data
+        for i_mono in 1:n_mono
+            energy -= fields[i_mono]*data_spins[i_data,i_mono]
+        end
+    end
+    energy = energy*(1-alpha)
+
+    resample_needed = true
+    energy_correction = 0.0
+
+
+
+    for i_param in 2:n_params
+        trial_weights .= weights
+        w_component = rand(1:n_feats)
+        w_variation = (2*rand()-1)*delta_w
+        trial_weights[w_component] += w_variation
+        
+        trial_fields = zeros(n_mono)
+        for i in 1:n_feats
+            trial_fields .+= features[:,i] .* trial_weights[i]
+        end
+        
+        trial_energy = 0
+        for i_data in 1:n_data
+            for i_mono in 1:n_mono
+                trial_energy -= trial_fields[i_mono]*data_spins[i_data,i_mono]
+            end
+        end
+        trial_energy = trial_energy*(1-alpha)
+
+        # If the previous step was rejected there is no need to estimate energy correction from scratch
+        if resample_needed
+            mp.set_fields!(polymers, fields)
+            mp.MMC_run!(polymers,trajs,n_strides,stride,inv_temps,spins_configs,sample_lag,n_samples)
+            avg_spins .= vec(mean(spins_configs, dims=2))
+            energy_correction = 0
+            for i_mono in 1:n_mono
+                energy_correction += avg_spins[i_mono]*features[i_mono,w_component]
+            end
+            energy_correction = energy_correction * (1-alpha)
+            resample_needed = false
+        end
+        
+        
+        delta_acc = -(trial_energy - energy) - w_variation * energy_correction * n_data
+        delta_acc>=0 ? w_acceptance=1 : w_acceptance=exp(delta_acc)
+        if i_param%100 == 0
+            println(i_param)
+            println("w1: ",weights[1]," ---> ",trial_weights[1])
+            println("w2: ",weights[2]," ---> ",trial_weights[2])
+            println("delta_acc: ", delta_acc)
+            println("delta_energy: ", -(trial_energy-energy))
+            println("correction: ", - w_variation * energy_correction)
+            println("acceptance: ", w_acceptance)
+        end
+        if w_acceptance > rand()
+            weights .= trial_weights
+            energy = trial_energy
+            resample_needed = true
+            fields .= trial_fields
+            accepted_moves += 1
+        end
+        param_series[1,i_param] = weights[1]
+        param_series[2,i_param] = weights[2]
+    end
+
+    
+    !isdir("AMHI_data") && mkdir("AMHI_data")
+    open("AMHI_data/weights.txt", "w") do io
+        writedlm(io, param_series)
+    end
+    
+    #mp.write_results(polymers[1],trajs[1])
 
 end
 
@@ -257,15 +400,38 @@ function generate_data(features_file::String, n_strides::Int, weights::Array{Flo
     mp.MMC_run!(polymers, trajs, n_strides, stride, inv_temps)
     mp.MMC_run!(polymers, trajs, n_strides, stride, inv_temps)
     
-    n_data = 10
+    n_data = 100
     summary_stats = zeros(4,n_data)
     spins_conf = zeros(Int,n_mono,n_data)
+    
+
+    #
+    poly_confs = zeros(Int,n_data*3,n_mono)
+    #
+
     for i_data in 1:n_data
+        println(i_data)
         mp.MMC_run!(polymers, trajs, n_strides, stride, inv_temps)
         #mp.write_results(polymers[1],trajs[1])
         spins_conf[:,i_data] .= polymers[1].spins
+        for j in 1:3
+            poly_confs[(i_data-1)*3+j,:] .= polymers[1].coord[j,:]
+        end
     end
     compute_summary_stats!(summary_stats,spins_conf,features)
     println(summary_stats)
+    #=println(spins_conf)
+    open("saw_conf_data.txt","w") do io
+        writedlm(io,transpose(weights))
+        writedlm(io,transpose(spins_conf))
+    end
+    open("data_file.txt","w") do io
+        writedlm(io,transpose(weights))
+        writedlm(io,transpose(summary_stats))
+    end=#
+    open("poly_confs.txt","w") do io
+        writedlm(io,transpose(weights))
+        writedlm(io, poly_confs)
+    end
 end
 
