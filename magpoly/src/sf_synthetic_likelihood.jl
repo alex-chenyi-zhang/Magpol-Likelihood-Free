@@ -64,17 +64,16 @@ function compute_summary_stats!(ss::Matrix{Float64}, sp_conf::Matrix{Int}, feats
         #ss[2,i_sample] = mean(sp_conf[:,i_sample].*feats)
         ss[1,i_sample]=0
         ss[2,i_sample]=0
+        ss[3,i_sample]=0
         for i_m in 1:n_m
             ss[1,i_sample] += sp_conf[i_m,i_sample]
             ss[2,i_sample] += sp_conf[i_m,i_sample]*feats[i_m,1]
             ss[3,i_sample] += sp_conf[i_m,i_sample]*feats[i_m,2]
-            ss[4,i_sample] += sp_conf[i_m,i_sample]*feats[i_m,3]
         end
         ss[1,i_sample] = ss[1,i_sample]/n_m
         ss[2,i_sample] = ss[2,i_sample]/n_m
         ss[3,i_sample] = ss[3,i_sample]/n_m
-        ss[4,i_sample] = ss[4,i_sample]/n_m
-        ss[5,i_sample] = lag_p_autocovariance(sp_conf[:,i_sample], 3)
+        ss[4,i_sample] = lag_p_autocovariance(sp_conf[:,i_sample], 3)
     end
 end
 
@@ -133,7 +132,7 @@ function synthetic_likelihood_polymer(n_samples::Int, sample_lag::Int, n_params:
     cov_mat = zeros(n_ss,n_ss)
     #inv_cov_mat = zeros(3,3)
     delta_w = 0.05
-    param_series = zeros(2,n_params)
+    param_series = zeros(n_feats,n_params)
     SL_series = zeros(n_params)
     ss_mean_series = zeros(n_ss, n_params)
     #ss_cov_determinant_series = zeros(n_params)
