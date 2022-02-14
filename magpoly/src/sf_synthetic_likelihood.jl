@@ -68,11 +68,13 @@ function compute_summary_stats!(ss::Matrix{Float64}, sp_conf::Matrix{Int}, feats
             ss[1,i_sample] += sp_conf[i_m,i_sample]
             ss[2,i_sample] += sp_conf[i_m,i_sample]*feats[i_m,1]
             ss[3,i_sample] += sp_conf[i_m,i_sample]*feats[i_m,2]
+            ss[4,i_sample] += sp_conf[i_m,i_sample]*feats[i_m,3]
         end
         ss[1,i_sample] = ss[1,i_sample]/n_m
         ss[2,i_sample] = ss[2,i_sample]/n_m
         ss[3,i_sample] = ss[3,i_sample]/n_m
-        ss[4,i_sample] = lag_p_autocovariance(sp_conf[:,i_sample], 3)
+        ss[4,i_sample] = ss[4,i_sample]/n_m
+        ss[5,i_sample] = lag_p_autocovariance(sp_conf[:,i_sample], 3)
     end
 end
 
@@ -136,8 +138,8 @@ function synthetic_likelihood_polymer(n_samples::Int, sample_lag::Int, n_params:
     ss_mean_series = zeros(n_ss, n_params)
     #ss_cov_determinant_series = zeros(n_params)
     summary_stats = zeros(n_ss, n_samples)
-    weights = zeros(2)
-    trial_weights = zeros(2)
+    weights = zeros(n_feats)
+    trial_weights = zeros(n_feats)
     weights .= initial_weights
 
     fields = zeros(n_mono)
@@ -158,6 +160,7 @@ function synthetic_likelihood_polymer(n_samples::Int, sample_lag::Int, n_params:
     
     param_series[1,1] = weights[1]
     param_series[2,1] = weights[2]
+    param_series[3,1] = weights[3]
     SL_series[1] = syn_like 
     w_acceptance = 0.0
     
@@ -169,7 +172,7 @@ function synthetic_likelihood_polymer(n_samples::Int, sample_lag::Int, n_params:
             trial_weights[2] += (2*rand()-1)*delta_w
         end=#
             
-        trial_weights .= weights .+ (2 .* rand(2) .-1) .*delta_w
+        trial_weights .= weights .+ (2 .* rand(n_feats) .-1) .*delta_w
         
         
         fields = zeros(n_mono)
@@ -190,10 +193,11 @@ function synthetic_likelihood_polymer(n_samples::Int, sample_lag::Int, n_params:
         
         delta_syn_like = trial_syn_like -syn_like
         delta_syn_like>=0 ? w_acceptance=1 : w_acceptance=exp(delta_syn_like)
-        if i_param%100 == 0
+        if i_param%10 == 0
             println(i_param)
             println("w1: ",weights[1]," ---> ",trial_weights[1])
             println("w2: ",weights[2]," ---> ",trial_weights[2])
+            println("w3: ",weights[3]," ---> ",trial_weights[3])
             println("delta_syn_like: ", delta_syn_like)
             println("acceptance: ", w_acceptance)
         end
@@ -204,6 +208,7 @@ function synthetic_likelihood_polymer(n_samples::Int, sample_lag::Int, n_params:
         end
         param_series[1,i_param] = weights[1]
         param_series[2,i_param] = weights[2]
+        param_series[3,i_param] = weights[3]
         SL_series[i_param] = syn_like
     end
 
@@ -270,8 +275,8 @@ function amhi_polymer(n_samples::Int, sample_lag::Int, n_params::Int, initial_we
     param_series = zeros(n_feats,n_params)
     avg_spins = zeros(n_mono, n_samples)
     
-    weights = zeros(2)
-    trial_weights = zeros(2)
+    weights = zeros(n_feats)
+    trial_weights = zeros(n_feats)
     weights .= initial_weights
 
     fields = zeros(n_mono)
@@ -282,6 +287,7 @@ function amhi_polymer(n_samples::Int, sample_lag::Int, n_params::Int, initial_we
    
     param_series[1,1] = weights[1]
     param_series[2,1] = weights[2]
+    param_series[3,1] = weights[3]
     w_acceptance = 0.0
 
     energy = 0
@@ -332,10 +338,11 @@ function amhi_polymer(n_samples::Int, sample_lag::Int, n_params::Int, initial_we
         
         delta_acc = -(trial_energy - energy) - w_variation * energy_correction * n_data
         delta_acc>=0 ? w_acceptance=1 : w_acceptance=exp(delta_acc)
-        if i_param%100 == 0
+        if i_param%10 == 0
             println(i_param)
             println("w1: ",weights[1]," ---> ",trial_weights[1])
             println("w2: ",weights[2]," ---> ",trial_weights[2])
+            println("w3: ",weights[3]," ---> ",trial_weights[3])
             println("delta_acc: ", delta_acc)
             println("delta_energy: ", -(trial_energy-energy))
             println("correction: ", - w_variation * energy_correction)
@@ -350,6 +357,7 @@ function amhi_polymer(n_samples::Int, sample_lag::Int, n_params::Int, initial_we
         end
         param_series[1,i_param] = weights[1]
         param_series[2,i_param] = weights[2]
+        param_series[3,i_param] = weights[3]
     end
 
     
@@ -395,43 +403,48 @@ function generate_data(features_file::String, n_strides::Int, weights::Array{Flo
         fields .+= features[:,i] .* weights[i]
     end
     mp.set_fields!(polymers, fields)
-
-    mp.MMC_run!(polymers, trajs, n_strides, stride, inv_temps)
-    mp.MMC_run!(polymers, trajs, n_strides, stride, inv_temps)
-    mp.MMC_run!(polymers, trajs, n_strides, stride, inv_temps)
     
-    n_data = 100
+    #here I run the simulation for a while in order to equilibrate the chain
+    for i_burnin in 1:50
+        println("burnin number: ", i_burnin)
+        mp.MMC_run!(polymers, trajs, n_strides, stride, inv_temps)
+    end
+    
+    n_data = 10
     summary_stats = zeros(4,n_data)
     spins_conf = zeros(Int,n_mono,n_data)
     
 
     #
-    poly_confs = zeros(Int,n_data*3,n_mono)
+    #poly_confs = zeros(Int,n_data*3,n_mono)
     #
 
     for i_data in 1:n_data
-        println(i_data)
+        println("Number of data point:  ", i_data)
         mp.MMC_run!(polymers, trajs, n_strides, stride, inv_temps)
         #mp.write_results(polymers[1],trajs[1])
         spins_conf[:,i_data] .= polymers[1].spins
-        for j in 1:3
-            poly_confs[(i_data-1)*3+j,:] .= polymers[1].coord[j,:]
-        end
+        #for j in 1:3
+        #    poly_confs[(i_data-1)*3+j,:] .= polymers[1].coord[j,:]
+        #end
     end
-    compute_summary_stats!(summary_stats,spins_conf,features)
-    println(summary_stats)
-    #=println(spins_conf)
+    #compute_summary_stats!(summary_stats,spins_conf,features)
+    #println(summary_stats)
+    #println(spins_conf)
     open("saw_conf_data.txt","w") do io
         writedlm(io,transpose(weights))
         writedlm(io,transpose(spins_conf))
     end
-    open("data_file.txt","w") do io
+    #=open("data_file.txt","w") do io
         writedlm(io,transpose(weights))
         writedlm(io,transpose(summary_stats))
     end=#
-    open("poly_confs.txt","w") do io
+    #=open("poly_confs.txt","w") do io
         writedlm(io,transpose(weights))
         writedlm(io, poly_confs)
-    end
+    end=#
+
+
+    mp.write_results(polymers[1])
 end
 
