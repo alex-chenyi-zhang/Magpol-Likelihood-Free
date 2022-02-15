@@ -228,7 +228,7 @@ end
 #####################################################################################
 
 # AMHI: Approximate metropolis hastings inference
-function amhi_polymer(n_samples::Int, sample_lag::Int, n_params::Int, initial_weights::Array{Float64}, features_file::String)
+function amhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::Int, initial_weights::Array{Float64}, features_file::String)
     # Read features from file
     io = open(features_file, "r")
     features = readdlm(io,Float64)
@@ -247,7 +247,6 @@ function amhi_polymer(n_samples::Int, sample_lag::Int, n_params::Int, initial_we
 
 
     accepted_moves = 0
-    stride = 100
     n_strides = cld(n_samples*sample_lag, stride) # integer ceiling of the division
     spins_coupling = 1.0
     alpha = 0.5
@@ -284,9 +283,10 @@ function amhi_polymer(n_samples::Int, sample_lag::Int, n_params::Int, initial_we
     end
     #############################################################
    
-    param_series[1,1] = weights[1]
+    #=param_series[1,1] = weights[1]
     param_series[2,1] = weights[2]
-    param_series[3,1] = weights[3]
+    param_series[3,1] = weights[3]=#
+    param_series[:,1] .= weights
     w_acceptance = 0.0
 
     energy = 0
@@ -322,17 +322,19 @@ function amhi_polymer(n_samples::Int, sample_lag::Int, n_params::Int, initial_we
         trial_energy = trial_energy*(1-alpha)
 
         # If the previous step was rejected there is no need to estimate energy correction from scratch
-        if resample_needed
-            mp.set_fields!(polymers, fields)
-            mp.MMC_run!(polymers,trajs,n_strides,stride,inv_temps,spins_configs,sample_lag,n_samples)
-            avg_spins .= vec(mean(spins_configs, dims=2))
-            energy_correction = 0
-            for i_mono in 1:n_mono
-                energy_correction += avg_spins[i_mono]*features[i_mono,w_component]
-            end
-            energy_correction = energy_correction * (1-alpha)
-            resample_needed = false
+        # but maybe not recomputing the estimates will induce some additional bias in the chain
+        #if resample_needed
+        mp.set_fields!(polymers, fields)
+        mp.MMC_run!(polymers,trajs,n_strides,stride,inv_temps,spins_configs,sample_lag,n_samples)
+        avg_spins .= vec(mean(spins_configs, dims=2))
+        energy_correction = 0
+        for i_mono in 1:n_mono
+            energy_correction += avg_spins[i_mono]*features[i_mono,w_component]
         end
+        #energy_correction = energy_correction * (1-alpha) 
+        energy_correction = energy_correction * (1-alpha)
+        #resample_needed = false
+        #end
         
         
         delta_acc = -(trial_energy - energy) - w_variation * energy_correction * n_data
