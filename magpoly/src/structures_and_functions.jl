@@ -617,7 +617,7 @@ function MMC_run_base!(polymers::Array{Magnetic_polymer}, trajs::Array{MC_data},
             accepted_swaps += 1
         end
     end
-    println("Accepted_swaps: ", accepted_swaps)
+    #println("Accepted_swaps: ", accepted_swaps)
 end
 
 function MMC_run_save!(polymers::Array{Magnetic_polymer}, trajs::Array{MC_data},

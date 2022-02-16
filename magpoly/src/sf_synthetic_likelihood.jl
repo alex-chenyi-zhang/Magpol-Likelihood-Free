@@ -88,7 +88,7 @@ end
 
 
 ## for now this is just the backbone of the function to carry out the likelihood-free inference task
-function synthetic_likelihood_polymer(n_samples::Int, sample_lag::Int, n_params::Int, initial_weights::Array{Float64}, features_file::String)
+function synthetic_likelihood_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::Int, initial_weights::Array{Float64}, features_file::String)
     io = open(features_file, "r")
     features = readdlm(io,Float64)
     close(io)
@@ -106,7 +106,6 @@ function synthetic_likelihood_polymer(n_samples::Int, sample_lag::Int, n_params:
     println(n_ss, "\n\n")
 
     accepted_moves = 0
-    stride = 100
     n_strides = cld(n_samples*sample_lag, stride) # integer ceiling of the division
     spins_coupling = 1.0
     alpha = 0.5
@@ -147,6 +146,10 @@ function synthetic_likelihood_polymer(n_samples::Int, sample_lag::Int, n_params:
     end
 
     mp.set_fields!(polymers, fields)
+    for i_eq in 1:20
+        mp.MMC_run!(polymers,trajs,n_strides,stride,inv_temps)
+    end
+
     mp.MMC_run!(polymers,trajs,n_strides,stride,inv_temps,spins_configs,sample_lag,n_samples)
     compute_summary_stats!(summary_stats, spins_configs, features)
     ss_mean_series[:,1] .= vec(mean(summary_stats, dims=2))
@@ -179,6 +182,8 @@ function synthetic_likelihood_polymer(n_samples::Int, sample_lag::Int, n_params:
             fields .+= features[:,i] .* trial_weights[i]
         end
         mp.set_fields!(polymers, fields)
+
+        mp.MMC_run!(polymers,trajs,n_strides,stride,inv_temps) # This is an short equilibration run so that the expectations are a bit better when changing weights
         mp.MMC_run!(polymers,trajs,n_strides,stride,inv_temps,spins_configs,sample_lag,n_samples)
         compute_summary_stats!(summary_stats, spins_configs, features)
 
@@ -210,6 +215,7 @@ function synthetic_likelihood_polymer(n_samples::Int, sample_lag::Int, n_params:
         param_series[3,i_param] = weights[3]
         SL_series[i_param] = syn_like
     end
+    println("Acceptance ratio: ", accepted_moves/n_params)
 
     
     !isdir("SL_data") && mkdir("SL_data")
@@ -282,7 +288,11 @@ function amhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::In
         fields .+= features[:,i] .* weights[i]
     end
     #############################################################
-   
+    
+    mp.set_fields!(polymers, fields)
+    for i_eq in 1:20
+        mp.MMC_run!(polymers,trajs,n_strides,stride,inv_temps)
+    end
     #=param_series[1,1] = weights[1]
     param_series[2,1] = weights[2]
     param_series[3,1] = weights[3]=#
@@ -325,6 +335,8 @@ function amhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::In
         # but maybe not recomputing the estimates will induce some additional bias in the chain
         #if resample_needed
         mp.set_fields!(polymers, fields)
+
+        mp.MMC_run!(polymers,trajs,n_strides,stride,inv_temps) # This is an short equilibration run so that the expectations are a bit better when changing weights
         mp.MMC_run!(polymers,trajs,n_strides,stride,inv_temps,spins_configs,sample_lag,n_samples)
         avg_spins .= vec(mean(spins_configs, dims=2))
         energy_correction = 0
@@ -360,6 +372,8 @@ function amhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::In
         param_series[2,i_param] = weights[2]
         param_series[3,i_param] = weights[3]
     end
+    println("Acceptance ratio: ", accepted_moves/n_params)
+
 
     
     !isdir("AMHI_data") && mkdir("AMHI_data")
