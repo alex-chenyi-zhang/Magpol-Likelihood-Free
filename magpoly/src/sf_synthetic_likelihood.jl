@@ -234,7 +234,7 @@ end
 #####################################################################################
 
 # AMHI: Approximate metropolis hastings inference
-function amhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::Int, initial_weights::Array{Float64}, features_file::String)
+function amhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::Int, delta_w::Float64,initial_weights::Array{Float64}, features_file::String)
     # Read features from file
     io = open(features_file, "r")
     features = readdlm(io,Float64)
@@ -275,7 +275,7 @@ function amhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::In
     end 
 
     
-    delta_w = 0.05
+    #delta_w = 0.05
     param_series = zeros(n_feats,n_params)
     avg_spins = zeros(n_mono, n_samples)
     
@@ -293,9 +293,7 @@ function amhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::In
     for i_eq in 1:20
         mp.MMC_run!(polymers,trajs,n_strides,stride,inv_temps)
     end
-    #=param_series[1,1] = weights[1]
-    param_series[2,1] = weights[2]
-    param_series[3,1] = weights[3]=#
+    
     param_series[:,1] .= weights
     w_acceptance = 0.0
 
@@ -310,13 +308,18 @@ function amhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::In
     resample_needed = true
     energy_correction = 0.0
 
-
+    ##
+    w_variation = zeros(n_feats)
+    ##
 
     for i_param in 2:n_params
-        trial_weights .= weights
-        w_component = rand(1:n_feats)
-        w_variation = (2*rand()-1)*delta_w
-        trial_weights[w_component] += w_variation
+        #trial_weights .= weights
+        #w_component = rand(1:n_feats)
+        #w_variation = (2*rand()-1)*delta_w
+        #trial_weights[w_component] += w_variation
+
+        w_variation .= (2 .* rand(n_feats) .-1) .*delta_w
+        trial_weights .= weights .+ w_variation
         
         trial_fields = zeros(n_mono)
         for i in 1:n_feats
@@ -340,25 +343,28 @@ function amhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::In
         mp.MMC_run!(polymers,trajs,n_strides,stride,inv_temps,spins_configs,sample_lag,n_samples)
         avg_spins .= vec(mean(spins_configs, dims=2))
         energy_correction = 0
-        for i_mono in 1:n_mono
-            energy_correction += avg_spins[i_mono]*features[i_mono,w_component]
+        for j in 1:n_feats
+            for i_mono in 1:n_mono
+                #energy_correction += avg_spins[i_mono]*features[i_mono,w_component]
+                energy_correction += avg_spins[i_mono] * features[i_mono, j] * w_variation[j]
+            end
         end
-        #energy_correction = energy_correction * (1-alpha) 
         energy_correction = energy_correction * (1-alpha)
         #resample_needed = false
         #end
         
         
-        delta_acc = -(trial_energy - energy) - w_variation * energy_correction * n_data
+        #delta_acc = -(trial_energy - energy) - w_variation * energy_correction * n_data
+        delta_acc = -(trial_energy - energy) - energy_correction * n_data
         delta_acc>=0 ? w_acceptance=1 : w_acceptance=exp(delta_acc)
         if i_param%10 == 0
             println(i_param)
             println("w1: ",weights[1]," ---> ",trial_weights[1])
             println("w2: ",weights[2]," ---> ",trial_weights[2])
             println("w3: ",weights[3]," ---> ",trial_weights[3])
-            println("delta_acc: ", delta_acc)
             println("delta_energy: ", -(trial_energy-energy))
-            println("correction: ", - w_variation * energy_correction)
+            println("delta_acc: ", delta_acc)
+            println("order of error: ", - sum(w_variation.^2)*n_data)
             println("acceptance: ", w_acceptance)
         end
         if w_acceptance > rand()
@@ -377,11 +383,11 @@ function amhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::In
 
     
     !isdir("AMHI_data") && mkdir("AMHI_data")
-    open("AMHI_data/weights.txt", "w") do io
+    open("AMHI_data/weights_$(n_data)amh$(n_samples)_$(delta_w).txt", "w") do io
         writedlm(io, param_series)
     end
     
-    #mp.write_results(polymers[1],trajs[1])
+    mp.write_results(polymers[1],trajs[1])
 
 end
 
