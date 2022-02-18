@@ -431,7 +431,7 @@ function generate_data(features_file::String, n_strides::Int, weights::Array{Flo
         mp.MMC_run!(polymers, trajs, n_strides, stride, inv_temps)
     end
     
-    n_data = 10
+    n_data = 20
     summary_stats = zeros(4,n_data)
     spins_conf = zeros(Int,n_mono,n_data)
     
