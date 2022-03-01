@@ -9,6 +9,8 @@ magpoly/SL_data/
 magpoly/AMHI_data/
 CG_content_433.txt
 final_config*.txt
+saw_conf_data*.txt
+data_file*.txt
 final_config.txt
 MC_data*.txt
 MC_data.txt

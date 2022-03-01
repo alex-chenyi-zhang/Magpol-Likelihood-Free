@@ -88,7 +88,7 @@ end
 
 
 ## for now this is just the backbone of the function to carry out the likelihood-free inference task
-function synthetic_likelihood_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::Int, initial_weights::Array{Float64}, features_file::String)
+function synthetic_likelihood_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::Int, delta_w::Float64,initial_weights::Array{Float64}, features_file::String, data_file::String)
     io = open(features_file, "r")
     features = readdlm(io,Float64)
     close(io)
@@ -97,7 +97,7 @@ function synthetic_likelihood_polymer(n_samples::Int, sample_lag::Int, stride::I
 
     #data = [0.6036745406824147, -0.3997000374953125, -0.3992614680299055, 0.06693990928046743] # 2, -1.5
 
-    io = open("data_file.txt", "r")
+    io = open(data_file, "r")
     data = readdlm(io,Float64; header=true)[1][1:end,:]
     close(io)
     println(data,"\n\n")
@@ -130,7 +130,7 @@ function synthetic_likelihood_polymer(n_samples::Int, sample_lag::Int, stride::I
 
     cov_mat = zeros(n_ss,n_ss)
     #inv_cov_mat = zeros(3,3)
-    delta_w = 0.05
+    #delta_w = 0.05
     param_series = zeros(n_feats,n_params)
     SL_series = zeros(n_params)
     ss_mean_series = zeros(n_ss, n_params)
@@ -234,7 +234,7 @@ end
 #####################################################################################
 
 # AMHI: Approximate metropolis hastings inference
-function amhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::Int, delta_w::Float64,initial_weights::Array{Float64}, features_file::String)
+function amhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::Int, delta_w::Float64,initial_weights::Array{Float64}, features_file::String, data_file::String)
     # Read features from file
     io = open(features_file, "r")
     features = readdlm(io,Float64)
@@ -243,7 +243,7 @@ function amhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::In
     n_feats = size(features, 2)
 
     # Read generated data. In this algo they're not summary stats but the full data!
-    io = open("saw_conf_data.txt","r")
+    io = open(data_file,"r")
     data_spins = readdlm(io, Int64; header=true)[1][1:end,:]
     close(io)
     n_data = size(data_spins, 1)
@@ -254,7 +254,8 @@ function amhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::In
 
     accepted_moves = 0
     n_strides = cld(n_samples*sample_lag, stride) # integer ceiling of the division
-    spins_coupling = 1.0
+    #spins_coupling = 1.0
+    spins_coupling = 0.0
     alpha = 0.5
     inv_temps = [1.0, 0.9, 0.8, 0.74, 0.65, 0.62, 0.6, 0.55, 0.5, 0.4]
     n_temps = length(inv_temps)
@@ -431,7 +432,7 @@ function generate_data(features_file::String, n_strides::Int, weights::Array{Flo
         mp.MMC_run!(polymers, trajs, n_strides, stride, inv_temps)
     end
     
-    n_data = 20
+    n_data = 10
     summary_stats = zeros(4,n_data)
     spins_conf = zeros(Int,n_mono,n_data)
     
