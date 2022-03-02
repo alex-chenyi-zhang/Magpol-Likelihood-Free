@@ -1,8 +1,8 @@
-include("src/magpoly.jl")
+#include("src/magpoly.jl")
 
-using .magpoly
-using Polynomials
-@time begin
+#using .magpoly
+#using Polynomials
+#@time begin
     #beta_temp = 0.5
     #spins_coupling = 1.0
     #alpha = 1.0
@@ -12,8 +12,12 @@ using Polynomials
     #magpoly.MMC_simulation(100, 2000, 500)
     #magpoly.MMC_simulation(150, 6000, 500)
     #magpoly.MMC_simulation(500, 200, 100)
-    magpoly.simulation("input.txt")
-end
+    #magpoly.simulation("input.txt")
+#end
+
+include("src/sf_synthetic_likelihood.jl")
+synthetic_likelihood_polymer(300, 2, 100, 30000, 0.03, [-0.6,2.2,0.3], "features.txt", "data_file_uncoupled.txt")
+
 
 
 

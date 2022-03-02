@@ -397,7 +397,7 @@ end
 #####################################################################################
 
 # QAMHI: Approximate metropolis hastings inference with Quadratic corrections
-function amhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::Int, delta_w::Float64,initial_weights::Array{Float64}, features_file::String, data_file::String)
+function Qamhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::Int, delta_w::Float64,initial_weights::Array{Float64}, features_file::String, data_file::String)
     # Read features from file
     io = open(features_file, "r")
     features = readdlm(io,Float64)
@@ -449,7 +449,10 @@ function amhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::In
     
     #delta_w = 0.05
     param_series = zeros(n_feats,n_params)
-    avg_spins = zeros(n_mono, n_samples)
+    #avg_spins = zeros(n_mono, n_samples)
+    overlaps = zeros(n_feats, n_samples)
+    avg_overlaps = zeros(n_feats)
+    cov_overlaps = zeros(n_feats, n_feats)
     
     weights = zeros(n_feats)
     trial_weights = zeros(n_feats)
@@ -477,7 +480,7 @@ function amhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::In
     end
     energy = energy*(1-alpha)
 
-    resample_needed = true
+    #resample_needed = true
     energy_correction = 0.0
 
     ##
@@ -509,26 +512,37 @@ function amhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::In
 
         mp.MMC_run!(polymers,trajs,n_strides,stride,inv_temps) # This is an short equilibration run so that the expectations are a bit better when changing weights
         mp.MMC_run!(polymers,trajs,n_strides,stride,inv_temps,spins_configs,sample_lag,n_samples)
-        avg_spins .= vec(mean(spins_configs, dims=2))
+        
+        
+        #=fill!(overlaps, 0.0)
+        for i_sample in 1:n_samples
+            for i_feat in 1:n_feats
+                for i_mono in 1:n_mono
+                    overlaps[i_feat, i_sample] += spins_configs[i_mono, i_sample]*features[i_mono, i_feat]
+                end
+            end
+        end=#
 
-            ### Here instead of computing avg_spins, compute for each of the n_samples configurations the set of
-            ### overlaps (which are the sufficient statistics of the exponential family). Then compute the 
-            ### empirical means and covariance matrices
-
-
+        overlaps = features'*spins_configs ## shorter but maybe less efficient way to write stuff in the previous nested for loops 
+        avg_overlaps = vec(mean(overlaps, dims=2))
+        cov_overlaps = cov(overaps, dims=2)
+        
         energy_correction = 0
+        #linear correction
         for j in 1:n_feats
-            for i_mono in 1:n_mono
-                #energy_correction += avg_spins[i_mono]*features[i_mono,w_component]
-                energy_correction += avg_spins[i_mono] * features[i_mono, j] * w_variation[j]
+            energy_correction += w_variation[j]*avg_overlaps[j] * (1-alpha)
+        end
+        #quadratic correction
+        quadratic_correction = 0
+        for j1 in 1:n_feats
+            for j2 in 1:n_feats
+                quadratic_correction += w_variation[j1]*cov_overlaps[j1,j2]*w_variation[j2]*(1-alpha)^2 * 0.5
             end
         end
-        energy_correction = energy_correction * (1-alpha)
+        energy_correction += quadratic_correction
         #resample_needed = false
         #end
         
-        
-        #delta_acc = -(trial_energy - energy) - w_variation * energy_correction * n_data
         delta_acc = -(trial_energy - energy) - energy_correction * n_data
         delta_acc>=0 ? w_acceptance=1 : w_acceptance=exp(delta_acc)
         if i_param%10 == 0
@@ -538,7 +552,7 @@ function amhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::In
             println("w3: ",weights[3]," ---> ",trial_weights[3])
             println("delta_energy: ", -(trial_energy-energy))
             println("delta_acc: ", delta_acc)
-            println("order of error: ", - sum(w_variation.^2)*n_data)
+            println("order of error: ", - sum(w_variation.^2)^1.5 *n_data)
             println("acceptance: ", w_acceptance)
         end
         if w_acceptance > rand()
@@ -554,8 +568,7 @@ function amhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::In
     end
     println("Acceptance ratio: ", accepted_moves/n_params)
 
-
-    
+ 
     !isdir("AMHI_data") && mkdir("AMHI_data")
     open("AMHI_data/weights_$(n_data)amh$(n_samples)_$(delta_w).txt", "w") do io
         writedlm(io, param_series)
