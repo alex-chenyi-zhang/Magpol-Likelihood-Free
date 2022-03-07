@@ -107,8 +107,8 @@ function synthetic_likelihood_polymer(n_samples::Int, sample_lag::Int, stride::I
 
     accepted_moves = 0
     n_strides = cld(n_samples*sample_lag, stride) # integer ceiling of the division
-    #spins_coupling = 1.0
-    spins_coupling = 0.0
+    spins_coupling = 1.0
+    #spins_coupling = 0.0
     alpha = 0.5
     inv_temps = [1.0, 0.9, 0.8, 0.74, 0.65, 0.62, 0.6, 0.55, 0.5, 0.4]
     n_temps = length(inv_temps)
@@ -233,7 +233,7 @@ end
 
 #####################################################################################
 #####################################################################################
-
+#=
 # AMHI: Approximate metropolis hastings inference
 function amhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::Int, delta_w::Float64,initial_weights::Array{Float64}, features_file::String, data_file::String)
     # Read features from file
@@ -255,8 +255,8 @@ function amhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::In
 
     accepted_moves = 0
     n_strides = cld(n_samples*sample_lag, stride) # integer ceiling of the division
-    #spins_coupling = 1.0
-    spins_coupling = 0.0
+    spins_coupling = 1.0
+    #spins_coupling = 0.0
     alpha = 0.5
     inv_temps = [1.0, 0.9, 0.8, 0.74, 0.65, 0.62, 0.6, 0.55, 0.5, 0.4]
     n_temps = length(inv_temps)
@@ -392,7 +392,187 @@ function amhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::In
     mp.write_results(polymers[1],trajs[1])
 
 end
+=#
 
+function amhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::Int, delta_w::Float64,initial_weights::Array{Float64}, features_file::String, data_file::String)
+    # Read features from file
+    io = open(features_file, "r")
+    features = readdlm(io,Float64)
+    close(io)
+    n_mono = size(features, 1)
+    n_feats = size(features, 2)
+
+    # Read generated data. In this algo they're not summary stats but the full data!
+    io = open(data_file,"r")
+    data_spins = readdlm(io, Int64; header=true)[1][1:end,:]
+    close(io)
+    n_data = size(data_spins, 1)
+    println(n_mono)
+    println(n_data)
+    println(typeof(data_spins))
+
+
+    accepted_moves = 0
+    n_strides = cld(n_samples*sample_lag, stride) # integer ceiling of the division
+    spins_coupling = 1.0
+    #spins_coupling = 0.0 ##############################################
+    ####################################################################
+    ###################################################################
+    ## RESET COUPLING TO 1 AFTER. NOW IT'S JUST TO BENCHMARK WRT A 
+    ## CASE WHERE WE HAVE ACCESS TO THE REAL POSTERIOR WITH J = 0
+    ###################################################################
+    ###################################################################
+    ###################################################################
+
+    alpha = 0.5
+    inv_temps = [1.0, 0.9, 0.8, 0.74, 0.65, 0.62, 0.6, 0.55, 0.5, 0.4]
+    n_temps = length(inv_temps)
+
+    spins_configs = zeros(Int, n_mono, n_samples) # where you store the generated data
+    
+    ########################################################### Initialize some quantitites in this section
+    polymers = Array{mp.Magnetic_polymer}(undef, n_temps)
+    trajs = Array{mp.MC_data}(undef, n_temps)
+    for i_temp in 1:n_temps
+        polymers[i_temp] = mp.Magnetic_polymer(n_mono, inv_temps[i_temp], spins_coupling, alpha)
+        trajs[i_temp] = mp.MC_data(n_strides*stride)
+        if isfile("simulation_data/final_config_$(n_mono)_$(inv_temps[1]).txt")
+            mp.initialize_poly!(polymers[i_temp],"simulation_data/final_config_$(n_mono)_$(inv_temps[1]).txt")
+        else
+            mp.initialize_poly!(polymers[i_temp])
+        end
+    end 
+
+    
+    param_series = zeros(n_feats,n_params)
+    overlaps = zeros(n_feats, n_samples)
+    avg_overlaps = zeros(n_feats)
+    #cov_overlaps = zeros(n_feats, n_feats)
+    
+    weights = zeros(n_feats)
+    trial_weights = zeros(n_feats)
+    weights .= initial_weights
+
+    fields = zeros(n_mono)
+    for i in 1:n_feats
+        fields .+= features[:,i] .* weights[i]
+    end
+    #############################################################
+    
+    mp.set_fields!(polymers, fields)
+    for i_eq in 1:20
+        mp.MMC_run!(polymers,trajs,n_strides,stride,inv_temps)
+    end
+    
+    param_series[:,1] .= weights
+    w_acceptance = 0.0
+
+    energy = 0
+    for i_data in 1:n_data
+        for i_mono in 1:n_mono
+            energy -= fields[i_mono]*data_spins[i_data,i_mono]
+        end
+    end
+    energy = energy*(1-alpha)
+
+    #resample_needed = true
+    energy_correction = 0.0
+
+    ##
+    w_variation = zeros(n_feats)
+    ##
+
+    for i_param in 2:n_params
+        
+        w_variation .= (2 .* rand(n_feats) .-1) .*delta_w
+        trial_weights .= weights .+ w_variation
+        
+        trial_fields = zeros(n_mono)
+        for i in 1:n_feats
+            trial_fields .+= features[:,i] .* trial_weights[i]
+        end
+        
+        trial_energy = 0
+        for i_data in 1:n_data
+            for i_mono in 1:n_mono
+                trial_energy -= trial_fields[i_mono]*data_spins[i_data,i_mono]
+            end
+        end
+        trial_energy = trial_energy*(1-alpha)
+
+        # If the previous step was rejected there is no need to estimate energy correction from scratch
+        # but maybe not recomputing the estimates will induce some additional bias in the chain
+        #if resample_needed
+        mp.set_fields!(polymers, fields)
+
+        mp.MMC_run!(polymers,trajs,n_strides,stride,inv_temps) # This is an short equilibration run so that the expectations are a bit better when changing weights
+        mp.MMC_run!(polymers,trajs,n_strides,stride,inv_temps,spins_configs,sample_lag,n_samples)
+        
+        
+        #=fill!(overlaps, 0.0)
+        for i_sample in 1:n_samples
+            for i_feat in 1:n_feats
+                for i_mono in 1:n_mono
+                    overlaps[i_feat, i_sample] += spins_configs[i_mono, i_sample]*features[i_mono, i_feat]
+                end
+            end
+        end=#
+
+        overlaps = features'*spins_configs ## shorter but maybe less efficient way to write stuff in the previous nested for loops 
+        avg_overlaps = vec(mean(overlaps, dims=2))
+        #cov_overlaps = cov(overlaps, dims=2)
+        
+        energy_correction = 0
+        #linear correction
+        for j in 1:n_feats
+            energy_correction += w_variation[j]*avg_overlaps[j] * (1-alpha)
+        end
+        #quadratic correction
+        #=quadratic_correction = 0
+        for j1 in 1:n_feats
+            for j2 in 1:n_feats
+                quadratic_correction += w_variation[j1]*cov_overlaps[j1,j2]*w_variation[j2]*(1-alpha)^2 * 0.5
+            end
+        end
+        energy_correction += quadratic_correction=#
+        #resample_needed = false
+        #end
+        
+        delta_acc = -(trial_energy - energy) - energy_correction * n_data
+        delta_acc>=0 ? w_acceptance=1 : w_acceptance=exp(delta_acc)
+        if i_param%10 == 0
+            println(i_param)
+            println("w1: ",weights[1]," ---> ",trial_weights[1])
+            println("w2: ",weights[2]," ---> ",trial_weights[2])
+            println("w3: ",weights[3]," ---> ",trial_weights[3])
+            println("delta_energy: ", -(trial_energy-energy))
+            println("delta_acc: ", delta_acc)
+            println("order of error: ", - sum(w_variation.^2) *n_data)
+            println("acceptance: ", w_acceptance)
+            println("avg acceptance: ", accepted_moves/i_param)
+        end
+        if w_acceptance > rand()
+            weights .= trial_weights
+            energy = trial_energy
+            resample_needed = true
+            fields .= trial_fields
+            accepted_moves += 1
+        end
+        param_series[1,i_param] = weights[1]
+        param_series[2,i_param] = weights[2]
+        param_series[3,i_param] = weights[3]
+    end
+    println("Acceptance ratio: ", accepted_moves/n_params)
+
+ 
+    !isdir("AMHI_data") && mkdir("AMHI_data")
+    open("AMHI_data/weights_$(n_data)amh$(n_samples)_$(delta_w).txt", "w") do io
+        writedlm(io, param_series)
+    end
+    
+    mp.write_results(polymers[1],trajs[1])
+
+end
 
 #####################################################################################
 
@@ -417,8 +597,8 @@ function Qamhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::I
 
     accepted_moves = 0
     n_strides = cld(n_samples*sample_lag, stride) # integer ceiling of the division
-    #spins_coupling = 1.0
-    spins_coupling = 0.0 ##############################################
+    spins_coupling = 1.0
+    #spins_coupling = 0.0 ##############################################
     ####################################################################
     ###################################################################
     ## RESET COUPLING TO 1 AFTER. NOW IT'S JUST TO BENCHMARK WRT A 
@@ -525,7 +705,7 @@ function Qamhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::I
 
         overlaps = features'*spins_configs ## shorter but maybe less efficient way to write stuff in the previous nested for loops 
         avg_overlaps = vec(mean(overlaps, dims=2))
-        cov_overlaps = cov(overaps, dims=2)
+        cov_overlaps = cov(overlaps, dims=2)
         
         energy_correction = 0
         #linear correction
@@ -553,7 +733,9 @@ function Qamhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::I
             println("delta_energy: ", -(trial_energy-energy))
             println("delta_acc: ", delta_acc)
             println("order of error: ", - sum(w_variation.^2)^1.5 *n_data)
+            println("ratio quadratic_correction/tot_corr: ", quadratic_correction/energy_correction)
             println("acceptance: ", w_acceptance)
+            println("avg acceptance: ", accepted_moves/i_param)
         end
         if w_acceptance > rand()
             weights .= trial_weights
@@ -570,7 +752,7 @@ function Qamhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::I
 
  
     !isdir("AMHI_data") && mkdir("AMHI_data")
-    open("AMHI_data/weights_$(n_data)amh$(n_samples)_$(delta_w).txt", "w") do io
+    open("AMHI_data/weights_$(n_data)Qamh$(n_samples)_$(delta_w).txt", "w") do io
         writedlm(io, param_series)
     end
     

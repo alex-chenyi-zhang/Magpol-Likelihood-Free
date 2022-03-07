@@ -16,7 +16,8 @@
 #end
 
 include("src/sf_synthetic_likelihood.jl")
-synthetic_likelihood_polymer(300, 2, 100, 30000, 0.03, [-0.6,2.2,0.3], "features.txt", "data_file_uncoupled.txt")
+#synthetic_likelihood_polymer(300, 2, 100, 30000, 0.03, [-0.6,2.2,0.3], "features.txt", "data_file_uncoupled.txt")
+Qamhi_polymer(200, 2, 100, 10000, 0.05, [-0.60148367,  0.94279556,  0.06326793], "features.txt", "saw_conf_data20.txt")
 
 
 
