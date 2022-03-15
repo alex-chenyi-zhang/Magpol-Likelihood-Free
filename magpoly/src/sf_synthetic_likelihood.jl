@@ -59,21 +59,19 @@ end
 function compute_summary_stats!(ss::Matrix{Float64}, sp_conf::Matrix{Int}, feats::Matrix{Float64})
     n_s = size(ss,2) #number of samples 
     n_m = size(sp_conf,1)
+    n_feats = size(feats, 2)
     for i_sample in 1:n_s
-        #ss[1,i_sample] = mean(sp_conf[:,i_sample])
-        #ss[2,i_sample] = mean(sp_conf[:,i_sample].*feats)
-        ss[1,i_sample]=0
-        ss[2,i_sample]=0
-        ss[3,i_sample]=0
-        for i_m in 1:n_m
-            ss[1,i_sample] += sp_conf[i_m,i_sample]
-            ss[2,i_sample] += sp_conf[i_m,i_sample]*feats[i_m,1]
-            ss[3,i_sample] += sp_conf[i_m,i_sample]*feats[i_m,2]
+        for i_feat in 1:n_feats
+            ss[i_feat,i_sample]=0
         end
-        ss[1,i_sample] = ss[1,i_sample]/n_m
-        ss[2,i_sample] = ss[2,i_sample]/n_m
-        ss[3,i_sample] = ss[3,i_sample]/n_m
-        ss[4,i_sample] = lag_p_autocovariance(sp_conf[:,i_sample], 3)
+        for i_m in 1:n_m
+            for i_feat in 1:n_feats
+                ss[i_feat,i_sample] += sp_conf[i_m,i_sample]*feats[i_m, i_feat]
+            end
+        end
+        for i_feat in 1:n_feats
+            ss[i_feat,i_sample] = ss[i_feat,i_sample]/n_m
+        end
     end
 end
 
@@ -94,8 +92,6 @@ function synthetic_likelihood_polymer(n_samples::Int, sample_lag::Int, stride::I
     close(io)
     n_mono = size(features, 1)
     n_feats = size(features, 2)
-
-    #data = [0.6036745406824147, -0.3997000374953125, -0.3992614680299055, 0.06693990928046743] # 2, -1.5
 
     io = open(data_file, "r")
     data = readdlm(io,Float64; header=true)[1][1:end,:]
@@ -205,6 +201,7 @@ function synthetic_likelihood_polymer(n_samples::Int, sample_lag::Int, stride::I
             println("w3: ",weights[3]," ---> ",trial_weights[3])
             println("delta_syn_like: ", delta_syn_like)
             println("acceptance: ", w_acceptance)
+            println("avg acceptance: ", accepted_moves/i_param)
         end
         if w_acceptance > rand()
             weights .= trial_weights
@@ -802,7 +799,7 @@ function generate_data(features_file::String, n_strides::Int, weights::Array{Flo
     end
     
     n_data = 10
-    summary_stats = zeros(4,n_data)
+    summary_stats = zeros(n_feats,n_data)
     spins_conf = zeros(Int,n_mono,n_data)
     
 

@@ -391,7 +391,7 @@ function MC_run_base!(pol::Magnetic_polymer, traj::MC_data, start::Int, finish::
     for i_step in (start+1):finish
         pivot = rand(2:pol.n_mono-1)
         p_move = rand(1:47)
-        if i_step%10000 == 0
+        if i_step%50000 == 0
             println("Pivot: ", pivot)
             println("Attmpted move: ", p_move)
             println("step number: ", i_step, "\n")
@@ -506,7 +506,7 @@ function MC_run_save!(pol::Magnetic_polymer, traj::MC_data, start::Int, finish::
     for i_step in (start+1):min(finish,sample_lag*n_samples)
         pivot = rand(2:pol.n_mono-1)
         p_move = rand(1:47)
-        if i_step%10000 == 0
+        if i_step%50000 == 0
             println("Pivot: ", pivot)
             println("Attmpted move: ", p_move)
             println("step number: ", i_step, "\n")
@@ -594,13 +594,13 @@ function MMC_run_base!(polymers::Array{Magnetic_polymer}, trajs::Array{MC_data},
     accepted_swaps = 0
     temp_coord = zeros(Int,3)
 
-    for i_strides in 1:n_strides
-        for i_temp in 1:n_temps
-            MC_run!(polymers[i_temp], trajs[i_temp],(i_strides-1)*stride+1,i_strides*stride)
-        end
+    for i_temp in 1:n_temps
+        MC_run!(polymers[i_temp], trajs[i_temp],1,stride)
+    end
 
+    for i_strides in 2:n_strides
         swap = rand(1:n_temps-1)
-        delta_ene = (inv_temps[swap] - inv_temps[swap+1]) * (trajs[swap+1].energies[i_strides*stride] - trajs[swap].energies[i_strides*stride])
+        delta_ene = (inv_temps[swap] - inv_temps[swap+1]) * (trajs[swap+1].energies[(i_strides-1)*stride] - trajs[swap].energies[(i_strides-1)*stride])
         alpha_swap = 0.0
         delta_ene<=0 ? alpha_swap=1.0 : alpha_swap=exp(-delta_ene)
         if alpha_swap >= rand()
@@ -615,6 +615,10 @@ function MMC_run_base!(polymers::Array{Magnetic_polymer}, trajs::Array{MC_data},
                 polymers[swap+1].spins[i_mono] = temp_spin
             end
             accepted_swaps += 1
+        end
+
+        for i_temp in 1:n_temps
+            MC_run!(polymers[i_temp], trajs[i_temp],(i_strides-1)*stride+1,i_strides*stride)
         end
     end
     #println("Accepted_swaps: ", accepted_swaps)
@@ -626,14 +630,14 @@ function MMC_run_save!(polymers::Array{Magnetic_polymer}, trajs::Array{MC_data},
     accepted_swaps = 0
     temp_coord = zeros(Int,3)
 
-    for i_strides in 1:n_strides
-        MC_run!(polymers[1], trajs[1],(i_strides-1)*stride+1,i_strides*stride, spins_configs,sample_lag, n_samples)
-        # Only the lowest temperature is the system we're using for our likelihood approx
-        # the chains at higher temps are only used to "fluidify" the chain of interest
-        for i_temp in 2:n_temps
-            MC_run!(polymers[i_temp], trajs[i_temp],(i_strides-1)*stride+1,i_strides*stride, sample_lag, n_samples)
-        end
+    MC_run!(polymers[1], trajs[1],1,stride, spins_configs,sample_lag, n_samples)
+    # Only the lowest temperature is the system we're using for our likelihood approx
+    # the chains at higher temps are only used to "fluidify" the chain of interest
+    for i_temp in 2:n_temps
+        MC_run!(polymers[i_temp], trajs[i_temp],1,stride, sample_lag, n_samples)
+    end
 
+    for i_strides in 2:n_strides
         swap = rand(1:n_temps-1)
         delta_ene = (inv_temps[swap] - inv_temps[swap+1]) * (trajs[swap+1].energies[i_strides*stride] - trajs[swap].energies[i_strides*stride])
         alpha_swap = 0.0
@@ -650,6 +654,12 @@ function MMC_run_save!(polymers::Array{Magnetic_polymer}, trajs::Array{MC_data},
                 polymers[swap+1].spins[i_mono] = temp_spin
             end
             accepted_swaps += 1
+        end
+        MC_run!(polymers[1], trajs[1],(i_strides-1)*stride+1,i_strides*stride, spins_configs,sample_lag, n_samples)
+        # Only the lowest temperature is the system we're using for our likelihood approx
+        # the chains at higher temps are only used to "fluidify" the chain of interest
+        for i_temp in 2:n_temps
+            MC_run!(polymers[i_temp], trajs[i_temp],(i_strides-1)*stride+1,i_strides*stride, sample_lag, n_samples)
         end
     end
     #println("Accepted_swaps: ", accepted_swaps)
