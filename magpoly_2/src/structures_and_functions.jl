@@ -23,14 +23,14 @@ end
 #########################################################################
 
 # This structure contains all I need to compute the Hamiltonian
-struct Magnetic_polymer{T1<:Int, T2<:AbstractFloat}
+struct Magnetic_polymer{T1<:Int64, T2<:Float64}
     n_mono::T1
-    inv_temp::T2
-    J::T2
-    alpha::T2
-    energy::T2
+    #inv_temp::T2
+    #J::T2  # The coupling is a vector because otherwise for an immutable structure I could not change its value
+    #alpha::T2
+    #energy::T2
     spins::Array{T1}
-    fields::Array{T2}
+    #fields::Array{T2}
     coord::Array{T1,2}         # Coordinates of the monomers
     trial_coord::Array{T1,2}
     hash_saw::Dict{Int64, Int64}
@@ -38,8 +38,13 @@ struct Magnetic_polymer{T1<:Int, T2<:AbstractFloat}
     trial_neighbours::Array{T1, 2}
 end
 
-function Magnetic_polymer(n_mono::T1, inv_temp::T2, J::T2, alpha::T2) where {T1<:Int, T2<:AbstractFloat}
-    Magnetic_polymer(n_mono, inv_temp, J, alpha, 0.0, zeros(Int, n_mono), zeros(n_mono), zeros(Int, 3,n_mono),
+#function Magnetic_polymer(n_mono::T1, inv_temp::T2, J::T2, alpha::T2) where {T1<:Int, T2<:AbstractFloat}
+#    Magnetic_polymer(n_mono, inv_temp, J, alpha, 0.0, zeros(Int, n_mono), zeros(n_mono), zeros(Int, 3,n_mono),
+#    zeros(Int, 3,n_mono), Dict{Int, Int}(), zeros(Int, 7,n_mono), zeros(Int, 7,n_mono))
+#end
+
+function Magnetic_polymer(n_mono::T1) where {T1<:Int64}
+    Magnetic_polymer(n_mono, zeros(Int, n_mono), zeros(Int, 3,n_mono),
     zeros(Int, 3,n_mono), Dict{Int, Int}(), zeros(Int, 7,n_mono), zeros(Int, 7,n_mono))
 end
 
@@ -64,7 +69,7 @@ end
 
 
 #The following method of the "initialize_poly!()" function allows initialization from file
-function initialize_poly!(poly::Magnetic_polymer, file_name::String)
+#=function initialize_poly!(poly::Magnetic_polymer, file_name::String)
     io = open(file_name, "r")
     data = readdlm(io,Int64)
     close(io)
@@ -82,18 +87,25 @@ function set_fields!(polymers::Array{Magnetic_polymer}, ff::Array{Float64})
             polymer.fields[i_mono] = ff[i_mono]
         end
     end
+end=#
+
+function set_coupling!(polymers::Array{Magnetic_polymer}, spin_coupling::Float64)
+    for polymer in polymers
+        polymer.J = spin_coupling
+    end
 end
 
 # This structure stores series of observables I'm computing along the MCMC
-struct MC_data{T1<:Int, T2<:AbstractFloat}
+struct MC_data{T1<:Int64, T2<:Float64}
     n_steps::T1
     energies::Array{T2}
+    ising_energies::Array{T2}
     magnetization::Array{T2}
     rg2::Array{T2}
 end
 
 function MC_data(n_steps::Int)
-    MC_data(n_steps, zeros(n_steps), zeros(n_steps), zeros(n_steps))
+    MC_data(n_steps, zeros(n_steps), zeros(n_steps), zeros(n_steps), zeros(n_steps))
 end
 
 #########################################################################
@@ -188,6 +200,16 @@ function gyration_radius_squared(pol::Magnetic_polymer)
     return rg2/pol.n_mono - r/(pol.n_mono)^2
 end
 
+#
+#
+#
+#
+#
+#
+#
+#
+#
+
 #########################################################################
 
 function compute_new_energy(pol::Magnetic_polymer, near::Array{Int,2}, ff::Array{Float64}, s::Array{Int})
@@ -199,7 +221,7 @@ function compute_new_energy(pol::Magnetic_polymer, near::Array{Int,2}, ff::Array
             ene_J -= s[i_mono] * s[near[j+1,i_mono]] * pol.J * 0.5
         end
     end
-    return ene*(1-pol.alpha) + ene_J*pol.alpha
+    return ene + ene_J ####
 end
 
 
