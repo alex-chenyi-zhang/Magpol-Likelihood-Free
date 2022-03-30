@@ -74,7 +74,7 @@ end
 
 
 
-#=
+
 function set_spins!(polymers::Array{Magnetic_polymer}, spins::Array{Int64})
     for polymer in polymers
         for i_mono in 1:polymer.n_mono
@@ -82,7 +82,7 @@ function set_spins!(polymers::Array{Magnetic_polymer}, spins::Array{Int64})
         end
     end
 end
-
+#=
 function set_fields!(polymers::Array{Magnetic_polymer}, ff::Array{Float64})
     for polymer in polymers
         for i_mono in 1:polymer.n_mono
@@ -357,7 +357,7 @@ function spins_MC!(pol::Magnetic_polymer, n_flips::Int, ff::Array{Float64}, s::A
 
         if acc > rand()
             delta_tot += delta_ene
-            delta_tot_J += trial_local_ene_J - local_ene_J
+            delta_tot_J += (trial_local_ene_J - local_ene_J)
             s[flip_candidate] = trial_spin_value
         end
     end
@@ -376,7 +376,8 @@ end
     is inferred by the compiler depending on the list of argument types. "MC_run_save!()" is the function
     that save the configurations and it will also be made into a MC_run!() module=#
 
-function MC_run_base!(pol::Magnetic_polymer, traj::MC_data, start::Int, finish::Int, inv_temp::Float64, J::Float64, fields::Array{Float64})
+function MC_run_base!(pol::Magnetic_polymer, traj::MC_data, start::Int, finish::Int, inv_temp::Float64, 
+                J::Float64, fields::Array{Float64}, quenched_spins::Bool=false)
     for i_mono in 1:pol.n_mono
         for j in 1:3
             pol.trial_coord[j,i_mono] = pol.coord[j,i_mono]
@@ -464,8 +465,11 @@ function MC_run_base!(pol::Magnetic_polymer, traj::MC_data, start::Int, finish::
             n_acc += 1
         end
         
-        delta_ene, _ = spins_MC!(pol, pol.n_mono,fields,pol.spins,pol.neighbours, J, inv_temp) ## spins_MC! return the total energy variation of the accepted spin n_flips
-        energy += delta_ene
+        if !quenched_spins
+            delta_ene, _ = spins_MC!(pol, pol.n_mono,fields,pol.spins,pol.neighbours, J, inv_temp) ## spins_MC! return the total energy variation of the accepted spin n_flips
+            energy += delta_ene
+        end
+
         traj.rg2[i_step] = gyration_radius_squared(pol)
         traj.magnetization[i_step] = mean(pol.spins)
         traj.energies[i_step] = energy
@@ -493,7 +497,8 @@ end
 #########################################################################
 
 # This function is like MC_run_base! but also save configurations
-function MC_run_save!(pol::Magnetic_polymer, traj::MC_data, start::Int, finish::Int, spins_configs::Matrix{Int}, sample_lag::Int, n_samples::Int, inv_temp::Float64, J::Float64, fields::Array{Float64})
+function MC_run_save!(pol::Magnetic_polymer, traj::MC_data, start::Int, finish::Int, spins_configs::Matrix{Int}, 
+                sample_lag::Int, n_samples::Int, inv_temp::Float64, J::Float64, fields::Array{Float64}, quenched_spins::Bool=false)
     for i_mono in 1:pol.n_mono
         for j in 1:3
             pol.trial_coord[j,i_mono] = pol.coord[j,i_mono]
@@ -580,9 +585,11 @@ function MC_run_save!(pol::Magnetic_polymer, traj::MC_data, start::Int, finish::
             n_acc += 1
         end
         
-        
-        delta_ene, _ = spins_MC!(pol, pol.n_mono,fields,pol.spins,pol.neighbours, J, inv_temp) ## spins_MC! return the total energy variation of the accepted spin n_flips
-        energy += delta_ene
+        if !quenched_spins
+            delta_ene, _ = spins_MC!(pol, pol.n_mono,fields,pol.spins,pol.neighbours, J, inv_temp) ## spins_MC! return the total energy variation of the accepted spin n_flips
+            energy += delta_ene
+        end
+
         traj.rg2[i_step] = gyration_radius_squared(pol)
         traj.magnetization[i_step] = mean(pol.spins)
         traj.energies[i_step] = energy
@@ -609,7 +616,8 @@ end
 #########################################################################
 #########################################################################
 
-function MC_run_save!(pol::Magnetic_polymer, traj::MC_data, start::Int, finish::Int, spins_configs::Matrix{Int}, ising_energies::Array{Float64}, sample_lag::Int, n_samples::Int, inv_temp::Float64, J::Float64, fields::Array{Float64})
+function MC_run_save!(pol::Magnetic_polymer, traj::MC_data, start::Int, finish::Int, spins_configs::Matrix{Int},
+                ising_energies::Array{Float64}, sample_lag::Int, n_samples::Int, inv_temp::Float64, J::Float64, fields::Array{Float64}, quenched_spins::Bool=false)
     for i_mono in 1:pol.n_mono
         for j in 1:3
             pol.trial_coord[j,i_mono] = pol.coord[j,i_mono]
@@ -698,10 +706,11 @@ function MC_run_save!(pol::Magnetic_polymer, traj::MC_data, start::Int, finish::
             n_acc += 1
         end
         
-        
-        delta_ene, delta_ene_J = spins_MC!(pol, pol.n_mono,fields,pol.spins,pol.neighbours, J, inv_temp) ## spins_MC! return the total energy variation of the accepted spin n_flips
-        energy += delta_ene
-        ising_energy += delta_ene_J
+        if !quenched_spins
+            delta_ene, delta_ene_J = spins_MC!(pol, pol.n_mono,fields,pol.spins,pol.neighbours, J, inv_temp) ## spins_MC! return the total energy variation of the accepted spin n_flips
+            energy += delta_ene
+            ising_energy += delta_ene_J
+        end
         traj.rg2[i_step] = gyration_radius_squared(pol)
         traj.magnetization[i_step] = mean(pol.spins)
         traj.energies[i_step] = energy
@@ -731,13 +740,13 @@ end
 # Multiple Markov Chains
 
 function MMC_run_base!(polymers::Array{Magnetic_polymer}, trajs::Array{MC_data},
-                    n_strides::Int, stride::Int, inv_temps::Array{Float64}, J::Float64, fields::Array{Float64})
+                    n_strides::Int, stride::Int, inv_temps::Array{Float64}, J::Float64, fields::Array{Float64}, quenched_spins::Bool=false)
     n_temps = length(inv_temps)
     accepted_swaps = 0
     temp_coord = zeros(Int,3)
 
     for i_temp in 1:n_temps
-        MC_run!(polymers[i_temp], trajs[i_temp],1,stride, inv_temps[i_temp], J, fields)
+        MC_run!(polymers[i_temp], trajs[i_temp],1,stride, inv_temps[i_temp], J, fields, quenched_spins)
     end
 
     for i_strides in 2:n_strides
@@ -760,23 +769,23 @@ function MMC_run_base!(polymers::Array{Magnetic_polymer}, trajs::Array{MC_data},
         end
 
         for i_temp in 1:n_temps
-            MC_run!(polymers[i_temp], trajs[i_temp],(i_strides-1)*stride+1,i_strides*stride, inv_temps[i_temp], J, fields)
+            MC_run!(polymers[i_temp], trajs[i_temp],(i_strides-1)*stride+1,i_strides*stride, inv_temps[i_temp], J, fields, quenched_spins)
         end
     end
     #println("Accepted_swaps: ", accepted_swaps)
 end
 
 function MMC_run_save!(polymers::Array{Magnetic_polymer}, trajs::Array{MC_data},
-                    n_strides::Int, stride::Int, inv_temps::Array{Float64}, spins_configs::Matrix{Int}, sample_lag::Int, n_samples::Int, J::Float64, fields::Array{Float64})
+                    n_strides::Int, stride::Int, inv_temps::Array{Float64}, spins_configs::Matrix{Int}, sample_lag::Int, n_samples::Int, J::Float64, fields::Array{Float64}, quenched_spins::Bool=false)
     n_temps = length(inv_temps)
     accepted_swaps = 0
     temp_coord = zeros(Int,3)
 
-    MC_run!(polymers[1], trajs[1],1,stride, spins_configs,sample_lag, n_samples, inv_temps[1], J, fields)
+    MC_run!(polymers[1], trajs[1],1,stride, spins_configs,sample_lag, n_samples, inv_temps[1], J, fields, quenched_spins)
     # Only the lowest temperature is the system we're using for our likelihood approx
     # the chains at higher temps are only used to "fluidify" the chain of interest
     for i_temp in 2:n_temps
-        MC_run!(polymers[i_temp], trajs[i_temp],1,stride, sample_lag, n_samples, inv_temps[i_temp], J, fields)
+        MC_run!(polymers[i_temp], trajs[i_temp],1,stride, sample_lag, n_samples, inv_temps[i_temp], J, fields, quenched_spins)
     end
 
     for i_strides in 2:n_strides
@@ -791,17 +800,22 @@ function MMC_run_save!(polymers::Array{Magnetic_polymer}, trajs::Array{MC_data},
                    polymers[swap].coord[j,i_mono] = polymers[swap+1].coord[j,i_mono]
                    polymers[swap+1].coord[j,i_mono] =  temp_coord[j]
                 end
-                temp_spin = polymers[swap].spins[i_mono]
-                polymers[swap].spins[i_mono] = polymers[swap+1].spins[i_mono]
-                polymers[swap+1].spins[i_mono] = temp_spin
+                
+            end
+            if !quenched_spins
+                for i_mono in 1:polymers[1].n_mono
+                    temp_spin = polymers[swap].spins[i_mono]
+                    polymers[swap].spins[i_mono] = polymers[swap+1].spins[i_mono]
+                    polymers[swap+1].spins[i_mono] = temp_spin
+                end
             end
             accepted_swaps += 1
         end
-        MC_run!(polymers[1], trajs[1],(i_strides-1)*stride+1,i_strides*stride, spins_configs,sample_lag, n_samples, inv_temps[1], J, fields)
+        MC_run!(polymers[1], trajs[1],(i_strides-1)*stride+1,i_strides*stride, spins_configs,sample_lag, n_samples, inv_temps[1], J, fields, quenched_spins)
         # Only the lowest temperature is the system we're using for our likelihood approx
         # the chains at higher temps are only used to "fluidify" the chain of interest
         for i_temp in 2:n_temps
-            MC_run!(polymers[i_temp], trajs[i_temp],(i_strides-1)*stride+1,i_strides*stride, sample_lag, n_samples, inv_temps[i_temp], J, fields)
+            MC_run!(polymers[i_temp], trajs[i_temp],(i_strides-1)*stride+1,i_strides*stride, sample_lag, n_samples, inv_temps[i_temp], J, fields, quenched_spins)
         end
     end
     #println("Accepted_swaps: ", accepted_swaps)
@@ -809,16 +823,16 @@ end
 
 ### This one calls for the lower temperature chain the MC_run() method that also saves the ising energies
 function MMC_run_save!(polymers::Array{Magnetic_polymer}, trajs::Array{MC_data},
-                    n_strides::Int, stride::Int, inv_temps::Array{Float64}, spins_configs::Matrix{Int}, ising_energies::Array{Float64}, sample_lag::Int, n_samples::Int, J::Float64, fields::Array{Float64})
+                    n_strides::Int, stride::Int, inv_temps::Array{Float64}, spins_configs::Matrix{Int}, ising_energies::Array{Float64}, sample_lag::Int, n_samples::Int, J::Float64, fields::Array{Float64}, quenched_spins::Bool=false)
     n_temps = length(inv_temps)
     accepted_swaps = 0
     temp_coord = zeros(Int,3)
 
-    MC_run!(polymers[1], trajs[1],1,stride, spins_configs, ising_energies, sample_lag, n_samples, inv_temps[1], J, fields)
+    MC_run!(polymers[1], trajs[1],1,stride, spins_configs, ising_energies, sample_lag, n_samples, inv_temps[1], J, fields, quenched_spins)
     # Only the lowest temperature is the system we're using for our likelihood approx
     # the chains at higher temps are only used to "fluidify" the chain of interest
     for i_temp in 2:n_temps
-        MC_run!(polymers[i_temp], trajs[i_temp],1,stride, sample_lag, n_samples, inv_temps[i_temp], J, fields)
+        MC_run!(polymers[i_temp], trajs[i_temp],1,stride, sample_lag, n_samples, inv_temps[i_temp], J, fields, quenched_spins)
     end
 
     for i_strides in 2:n_strides
@@ -833,17 +847,21 @@ function MMC_run_save!(polymers::Array{Magnetic_polymer}, trajs::Array{MC_data},
                     polymers[swap].coord[j,i_mono] = polymers[swap+1].coord[j,i_mono]
                     polymers[swap+1].coord[j,i_mono] =  temp_coord[j]
                 end
-                temp_spin = polymers[swap].spins[i_mono]
-                polymers[swap].spins[i_mono] = polymers[swap+1].spins[i_mono]
-                polymers[swap+1].spins[i_mono] = temp_spin
+            end
+            if !quenched_spins
+                for i_mono in 1:polymers[1].n_mono
+                    temp_spin = polymers[swap].spins[i_mono]
+                    polymers[swap].spins[i_mono] = polymers[swap+1].spins[i_mono]
+                    polymers[swap+1].spins[i_mono] = temp_spin
+                end
             end
             accepted_swaps += 1
         end
-        MC_run!(polymers[1], trajs[1],(i_strides-1)*stride+1,i_strides*stride, spins_configs, ising_energies, sample_lag, n_samples, inv_temps[1], J, fields)
+        MC_run!(polymers[1], trajs[1],(i_strides-1)*stride+1,i_strides*stride, spins_configs, ising_energies, sample_lag, n_samples, inv_temps[1], J, fields, quenched_spins)
         # Only the lowest temperature is the system we're using for our likelihood approx
         # the chains at higher temps are only used to "fluidify" the chain of interest
         for i_temp in 2:n_temps
-            MC_run!(polymers[i_temp], trajs[i_temp],(i_strides-1)*stride+1,i_strides*stride, sample_lag, n_samples, inv_temps[i_temp], J, fields)
+            MC_run!(polymers[i_temp], trajs[i_temp],(i_strides-1)*stride+1,i_strides*stride, sample_lag, n_samples, inv_temps[i_temp], J, fields, quenched_spins)
         end
     end
 #println("Accepted_swaps: ", accepted_swaps)
