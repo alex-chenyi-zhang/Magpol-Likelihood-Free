@@ -809,42 +809,42 @@ end
 
 ### This one calls for the lower temperature chain the MC_run() method that also saves the ising energies
 function MMC_run_save!(polymers::Array{Magnetic_polymer}, trajs::Array{MC_data},
-    n_strides::Int, stride::Int, inv_temps::Array{Float64}, spins_configs::Matrix{Int}, ising_energies::Array{Float64}, sample_lag::Int, n_samples::Int, J::Float64, fields::Array{Float64})
-n_temps = length(inv_temps)
-accepted_swaps = 0
-temp_coord = zeros(Int,3)
+                    n_strides::Int, stride::Int, inv_temps::Array{Float64}, spins_configs::Matrix{Int}, ising_energies::Array{Float64}, sample_lag::Int, n_samples::Int, J::Float64, fields::Array{Float64})
+    n_temps = length(inv_temps)
+    accepted_swaps = 0
+    temp_coord = zeros(Int,3)
 
-MC_run!(polymers[1], trajs[1],1,stride, spins_configs, ising_energies, sample_lag, n_samples, inv_temps[1], J, fields)
-# Only the lowest temperature is the system we're using for our likelihood approx
-# the chains at higher temps are only used to "fluidify" the chain of interest
-for i_temp in 2:n_temps
-MC_run!(polymers[i_temp], trajs[i_temp],1,stride, sample_lag, n_samples, inv_temps[i_temp], J, fields)
-end
+    MC_run!(polymers[1], trajs[1],1,stride, spins_configs, ising_energies, sample_lag, n_samples, inv_temps[1], J, fields)
+    # Only the lowest temperature is the system we're using for our likelihood approx
+    # the chains at higher temps are only used to "fluidify" the chain of interest
+    for i_temp in 2:n_temps
+        MC_run!(polymers[i_temp], trajs[i_temp],1,stride, sample_lag, n_samples, inv_temps[i_temp], J, fields)
+    end
 
-for i_strides in 2:n_strides
-swap = rand(1:n_temps-1)
-delta_ene = (inv_temps[swap] - inv_temps[swap+1]) * (trajs[swap+1].energies[i_strides*stride] - trajs[swap].energies[i_strides*stride])
-alpha_swap = 0.0
-delta_ene<=0 ? alpha_swap=1.0 : alpha_swap=exp(-delta_ene)
-if alpha_swap >= rand()
-for i_mono in 1:polymers[1].n_mono
-for j in 1:3
-   temp_coord[j] = polymers[swap].coord[j,i_mono] 
-   polymers[swap].coord[j,i_mono] = polymers[swap+1].coord[j,i_mono]
-   polymers[swap+1].coord[j,i_mono] =  temp_coord[j]
-end
-temp_spin = polymers[swap].spins[i_mono]
-polymers[swap].spins[i_mono] = polymers[swap+1].spins[i_mono]
-polymers[swap+1].spins[i_mono] = temp_spin
-end
-accepted_swaps += 1
-end
-MC_run!(polymers[1], trajs[1],(i_strides-1)*stride+1,i_strides*stride, spins_configs, ising_energies, sample_lag, n_samples, inv_temps[1], J, fields)
-# Only the lowest temperature is the system we're using for our likelihood approx
-# the chains at higher temps are only used to "fluidify" the chain of interest
-for i_temp in 2:n_temps
-MC_run!(polymers[i_temp], trajs[i_temp],(i_strides-1)*stride+1,i_strides*stride, sample_lag, n_samples, inv_temps[i_temp], J, fields)
-end
-end
+    for i_strides in 2:n_strides
+        swap = rand(1:n_temps-1)
+        delta_ene = (inv_temps[swap] - inv_temps[swap+1]) * (trajs[swap+1].energies[i_strides*stride] - trajs[swap].energies[i_strides*stride])
+        alpha_swap = 0.0
+        delta_ene<=0 ? alpha_swap=1.0 : alpha_swap=exp(-delta_ene)
+        if alpha_swap >= rand()
+            for i_mono in 1:polymers[1].n_mono
+                for j in 1:3
+                    temp_coord[j] = polymers[swap].coord[j,i_mono] 
+                    polymers[swap].coord[j,i_mono] = polymers[swap+1].coord[j,i_mono]
+                    polymers[swap+1].coord[j,i_mono] =  temp_coord[j]
+                end
+                temp_spin = polymers[swap].spins[i_mono]
+                polymers[swap].spins[i_mono] = polymers[swap+1].spins[i_mono]
+                polymers[swap+1].spins[i_mono] = temp_spin
+            end
+            accepted_swaps += 1
+        end
+        MC_run!(polymers[1], trajs[1],(i_strides-1)*stride+1,i_strides*stride, spins_configs, ising_energies, sample_lag, n_samples, inv_temps[1], J, fields)
+        # Only the lowest temperature is the system we're using for our likelihood approx
+        # the chains at higher temps are only used to "fluidify" the chain of interest
+        for i_temp in 2:n_temps
+            MC_run!(polymers[i_temp], trajs[i_temp],(i_strides-1)*stride+1,i_strides*stride, sample_lag, n_samples, inv_temps[i_temp], J, fields)
+        end
+    end
 #println("Accepted_swaps: ", accepted_swaps)
 end
