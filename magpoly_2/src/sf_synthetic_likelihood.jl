@@ -284,7 +284,7 @@ function amhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::In
         theta[n_feats+1] = 0.5
     end
     ###
-    theta[n_feats+1] = 0.5
+    #theta[n_feats+1] = 0.5
     ###
 
     fields = zeros(n_mono)
@@ -293,7 +293,7 @@ function amhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::In
     end
     #############################################################
     
-    #mp.set_fields!(polymers, fields)
+    
     for i_eq in 1:20
         mp.MMC_run!(polymers,trajs,n_strides,stride,inv_temps, theta[n_feats+1], fields) # theta[n_feats+1 is the coupling]
     end
@@ -308,7 +308,7 @@ function amhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::In
         end
     end
 
-    #resample_needed = true
+    
     energy_correction = 0.0
 
     ##
@@ -319,11 +319,11 @@ function amhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::In
         
         theta_variation .= (2 .* rand(n_feats+1) .-1) .*delta_theta
         ###
-        theta_variation[n_feats+1] = 0.0
+        #theta_variation[n_feats+1] = 0.0
         ###
         trial_theta .= theta .+ theta_variation
         
-
+    
         if trial_theta[n_feats+1]>=0 && trial_theta[n_feats+1]<= 1.0
             trial_fields = zeros(n_mono)
             for i in 1:n_feats
@@ -337,10 +337,7 @@ function amhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::In
                 end
             end
 
-            # If the previous step was rejected there is no need to estimate energy correction from scratch
-            # but maybe not recomputing the estimates will induce some additional bias in the chain
-            #if resample_needed
-            #mp.set_fields!(polymers, fields)
+            ##################################################
 
             mp.MMC_run!(polymers,trajs,n_strides,stride,inv_temps, theta[n_feats+1], fields) # This is an short equilibration run so that the expectations are a bit better when changing weights
             mp.MMC_run!(polymers,trajs,n_strides,stride,inv_temps,spins_configs,ising_energies,sample_lag,n_samples, theta[n_feats+1], fields)
@@ -356,20 +353,29 @@ function amhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::In
                 overlaps[n_feats+1, i_sample] = ising_energies[i_sample]
             end
 
-            #overlaps = features'*spins_configs ## shorter but maybe less efficient way to write stuff in the previous nested for loops 
+            
             avg_overlaps = vec(mean(overlaps, dims=2))
-            #cov_overlaps = cov(overlaps, dims=2)
             
             energy_correction = 0
             #linear correction
             for j in 1:n_feats+1
                 energy_correction += theta_variation[j]*avg_overlaps[j]
             end
+            energy_correction = energy_correction * n_data
+            ##################################################
             
-            #resample_needed = false
-            #end
+            energy_correction_J = 0.0
+            for i_data in 1:n_data
+                mp.set_spins!(polymers, data_spins[i_data,:])
+                # here I run the MC's with the extra 'true' argument to quench the spins
+                mp.MMC_run!(polymers,trajs,n_strides,stride,inv_temps, theta[n_feats+1], fields, true) # This is an short equilibration run so that the expectations are a bit better when changing weights
+                mp.MMC_run!(polymers,trajs,n_strides,stride,inv_temps,spins_configs,ising_energies,sample_lag,n_samples, theta[n_feats+1], fields, true)
+                energy_correction_J += mean(ising_energies) * theta_variation[n_feats+1]
+            end
+
             
-            delta_acc = -(trial_energy - energy) - energy_correction * n_data
+            ##################################################
+            delta_acc = -(trial_energy - energy) - energy_correction + energy_correction_J
             delta_acc>=0 ? acceptance=1 : acceptance=exp(delta_acc)
             if i_param%10 == 0
                 println(i_param)
