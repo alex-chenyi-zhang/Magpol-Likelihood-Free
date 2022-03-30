@@ -51,6 +51,15 @@ function MC_run!(pol::Magnetic_polymer, traj::MC_data, spins_configs::Matrix{Int
     MC_run_save!(pol, traj, 1, traj.n_steps, spins_configs, sample_lag, n_samples, inv_temp, J, fields)
 end
 
+"""
+    MC_run!(pol::Magnetic_polymer, traj::MC_data, start::Int, finish::Int, spins_configs::Matrix{Int}, ising_energies::Array{Float64}, sample_lag::Int, inv_temp::Float64, J::Float64, fields::Array{Float64})
+Not only the spin configurations are saved every 'sample_lag' steps but also the ising part of the energy. 
+The configurations are stored in spins_configs::Matrix{Int} and the energies in ising_energies::Array{Float64}
+"""
+function MC_run!(pol::Magnetic_polymer, traj::MC_data, start::Int, finish::Int, spins_configs::Matrix{Int}, ising_energies::Array{Float64}, sample_lag::Int, n_samples::Int, inv_temp::Float64, J::Float64, fields::Array{Float64})
+    MC_run_save!(pol, traj, start, finish, spins_configs, ising_energies, sample_lag, n_samples, inv_temp, J, fields)
+end
+
 
 
 #############################################################################################################
@@ -74,11 +83,22 @@ end
 """
     MMC_run!(polymers::Array{Magnetic_polymer}, trajs::Array{MC_data},
     n_strides::Int, stride::Int, inv_temps::Array{Float64}, spins_configs::Matrix{Int}, sample_lag::Int, J::Float64, fields::Array{Float64})
-Same thing as above but the spins configurations are saved once every 'sample_lag' steps
+Same thing as above but the spins configurations are saved once every 'sample_lag' steps. (only for the chain with lower temperature)
 """
 function MMC_run!(polymers::Array{Magnetic_polymer}, trajs::Array{MC_data},
     n_strides::Int, stride::Int, inv_temps::Array{Float64}, spins_configs::Matrix{Int}, sample_lag::Int,n_samples::Int, J::Float64, fields::Array{Float64})
     MMC_run_save!(polymers, trajs, n_strides ,stride, inv_temps,spins_configs,sample_lag,n_samples, J, fields)
+end
+
+"""
+    MMC_run!(polymers::Array{Magnetic_polymer}, trajs::Array{MC_data},
+    n_strides::Int, stride::Int, inv_temps::Array{Float64}, spins_configs::Matrix{Int}, ising_energies::Array{Float64}, sample_lag::Int, J::Float64, fields::Array{Float64})
+Same thing as above but the spins configurations are saved once every 'sample_lag' steps and also the ising part of the energy. (only for the chain with lower
+temperature)
+"""
+function MMC_run!(polymers::Array{Magnetic_polymer}, trajs::Array{MC_data},
+    n_strides::Int, stride::Int, inv_temps::Array{Float64}, spins_configs::Matrix{Int}, ising_energies::Array{Float64}, sample_lag::Int,n_samples::Int, J::Float64, fields::Array{Float64})
+    MMC_run_save!(polymers, trajs, n_strides ,stride, inv_temps,spins_configs, ising_energies, sample_lag,n_samples, J, fields)
 end
 
 
