@@ -520,7 +520,7 @@ function Qamhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::I
             
 
             mp.MMC_run!(polymers,trajs,n_strides,stride,inv_temps, theta[n_feats+1], fields) # This is an short equilibration run so that the expectations are a bit better when changing weights
-            mp.MMC_run!(polymers,trajs,n_strides,stride,inv_temps,spins_configs,sample_lag,n_samples, theta[n_feats+1], fields)
+            mp.MMC_run!(polymers,trajs,n_strides,stride,inv_temps,spins_configs,ising_energies, sample_lag,n_samples, theta[n_feats+1], fields)
             
             
             fill!(overlaps, 0.0)
@@ -549,7 +549,7 @@ function Qamhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::I
                     quadratic_correction += theta_variation[j1]*cov_overlaps[j1,j2]*theta_variation[j2] * 0.5
                 end
             end
-            #energy_correction += quadratic_correction
+            energy_correction += quadratic_correction
             energy_correction = energy_correction * n_data
 
             ##################################################
@@ -560,7 +560,7 @@ function Qamhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::I
                 # here I run the MC's with the extra 'true' argument to quench the spins
                 mp.MMC_run!(polymers,trajs,n_strides,stride,inv_temps, theta[n_feats+1], fields, true) # This is an short equilibration run so that the expectations are a bit better when changing weights
                 mp.MMC_run!(polymers,trajs,n_strides,stride,inv_temps,spins_configs,ising_energies,sample_lag,n_samples, theta[n_feats+1], fields, true)
-                energy_correction_J += mean(ising_energies) * theta_variation[n_feats+1]# + 0.5 * theta_variation[n_feats+1]^2 * var(ising_energies)
+                energy_correction_J += mean(ising_energies) * theta_variation[n_feats+1] + 0.5 * theta_variation[n_feats+1]^2 * var(ising_energies)
             end
 
             
