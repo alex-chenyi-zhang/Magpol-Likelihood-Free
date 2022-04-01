@@ -572,8 +572,8 @@ function Qamhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::I
                 println(i_param)
                 println("w1: ",theta[1]," ---> ",trial_theta[1])
                 println("w2: ",theta[2]," ---> ",trial_theta[2])
-                #println("w3: ",theta[3]," ---> ",trial_theta[3])
-                println("J : ",theta[3]," ---> ",trial_theta[3])
+                println("w3: ",theta[3]," ---> ",trial_theta[3])
+                println("J : ",theta[4]," ---> ",trial_theta[4])
                 println("delta_energy: ", -(trial_energy-energy))
                 println("delta_acc: ", delta_acc)
                 println("order of error: ", sum(theta_variation.^2)^1.5 *n_data)
@@ -593,7 +593,7 @@ function Qamhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::I
         param_series[1,i_param] = theta[1]
         param_series[2,i_param] = theta[2]
         param_series[3,i_param] = theta[3]
-        #param_series[4,i_param] = theta[4]
+        param_series[4,i_param] = theta[4]
     end
     println("Acceptance ratio: ", accepted_moves/n_params)
 
@@ -618,7 +618,7 @@ function generate_data(features_file::String, n_strides::Int, weights::Array{Flo
     n_mono = size(features, 1)
     n_feats = size(features, 2)
 
-    spins_coupling = 0.5
+    spins_coupling = 0.2
     inv_temps = [1.0, 0.9, 0.8, 0.74, 0.65, 0.62, 0.6, 0.55, 0.5, 0.4]
     n_temps = length(inv_temps)
     stride = 500
@@ -647,7 +647,7 @@ function generate_data(features_file::String, n_strides::Int, weights::Array{Flo
         mp.MMC_run!(polymers, trajs, n_strides, stride, inv_temps, spins_coupling, fields)
     end
     
-    n_data = 13
+    n_data = 4
     summary_stats = zeros(n_feats,n_data)
     spins_conf = zeros(Int,n_mono,n_data)
     
