@@ -599,7 +599,7 @@ function Qamhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::I
 
  
     !isdir("AMHI_data") && mkdir("AMHI_data")
-    open("AMHI_data/thetas_$(n_data)Qamh$(n_samples)_$(delta_w).txt", "w") do io
+    open("AMHI_data/thetas_$(n_data)Qamh$(n_samples)_$(delta_theta).txt", "w") do io
         writedlm(io, param_series)
     end
     
