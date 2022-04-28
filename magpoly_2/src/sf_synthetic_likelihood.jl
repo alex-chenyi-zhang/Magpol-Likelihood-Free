@@ -420,6 +420,7 @@ end
 # QAMHI: Approximate metropolis hastings inference with Quadratic corrections
 function Qamhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::Int, delta_theta::Float64,initial_theta::Array{Float64}, features_file::String, data_file::String)
     # Read features from file
+    println("gaussian")
     io = open(features_file, "r")
     features = readdlm(io,Float64)
     close(io)
@@ -502,7 +503,8 @@ function Qamhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::I
 
     for i_param in 2:n_params
         
-        theta_variation .= (2 .* rand(n_feats+1) .-1) .*delta_theta
+        #theta_variation .= (2 .* rand(n_feats+1) .-1) .*delta_theta
+        theta_variation .= randn(n_feats+1) .* delta_theta
         trial_theta .= theta .+ theta_variation
         
         if trial_theta[n_feats+1] > 0 && trial_theta[n_feats+1] <= 1.0
@@ -647,7 +649,7 @@ function generate_data(features_file::String, n_strides::Int, weights::Array{Flo
         mp.MMC_run!(polymers, trajs, n_strides, stride, inv_temps, spins_coupling, fields)
     end
     
-    n_data = 4
+    n_data = 10
     summary_stats = zeros(n_feats,n_data)
     spins_conf = zeros(Int,n_mono,n_data)
     
