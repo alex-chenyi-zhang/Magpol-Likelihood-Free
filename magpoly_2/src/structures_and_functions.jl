@@ -772,7 +772,7 @@ function MMC_run_base!(polymers::Array{Magnetic_polymer}, trajs::Array{MC_data},
             MC_run!(polymers[i_temp], trajs[i_temp],(i_strides-1)*stride+1,i_strides*stride, inv_temps[i_temp], J, fields, quenched_spins)
         end
     end
-    #println("Accepted_swaps: ", accepted_swaps)
+    println("Accepted_swaps: ", accepted_swaps)
 end
 
 function MMC_run_save!(polymers::Array{Magnetic_polymer}, trajs::Array{MC_data},
@@ -818,7 +818,7 @@ function MMC_run_save!(polymers::Array{Magnetic_polymer}, trajs::Array{MC_data},
             MC_run!(polymers[i_temp], trajs[i_temp],(i_strides-1)*stride+1,i_strides*stride, sample_lag, n_samples, inv_temps[i_temp], J, fields, quenched_spins)
         end
     end
-    #println("Accepted_swaps: ", accepted_swaps)
+    println("Accepted_swaps: ", accepted_swaps)
 end
 
 ### This one calls for the lower temperature chain the MC_run() method that also saves the ising energies
@@ -864,5 +864,5 @@ function MMC_run_save!(polymers::Array{Magnetic_polymer}, trajs::Array{MC_data},
             MC_run!(polymers[i_temp], trajs[i_temp],(i_strides-1)*stride+1,i_strides*stride, sample_lag, n_samples, inv_temps[i_temp], J, fields, quenched_spins)
         end
     end
-#println("Accepted_swaps: ", accepted_swaps)
+    println("Accepted_swaps: ", accepted_swaps)
 end
