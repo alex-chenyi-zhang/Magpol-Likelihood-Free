@@ -426,6 +426,7 @@ function Qamhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::I
     close(io)
     n_mono = size(features, 1)
     n_feats = size(features, 2)
+    println("Number of features: " ,n_feats)
 
     # Read generated data. In this algo they're not summary stats but the full data!
     io = open(data_file,"r")
@@ -442,7 +443,7 @@ function Qamhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::I
     #spins_coupling = 0.5
     
     #inv_temps = [1.0, 0.9, 0.8, 0.74, 0.65, 0.62, 0.6, 0.55, 0.5, 0.4]
-    inv_temps = [1.0, 0.96, 0.92, 0.89, 0.85, 0.83, 0.82, 0.79, 0.75, 0.67]
+    inv_temps = [1.0, 0.96, 0.92, 0.89, 0.85, 0.83, 0.82, 0.79, 0.75, 0.67, 0.57, 0.5, 0.4]
     n_temps = length(inv_temps)
 
     spins_configs = zeros(Int, n_mono, n_samples) # where you store the generated data
@@ -454,11 +455,11 @@ function Qamhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::I
     for i_temp in 1:n_temps
         polymers[i_temp] = mp.Magnetic_polymer(n_mono)#, inv_temps[i_temp], spins_coupling, alpha)
         trajs[i_temp] = mp.MC_data(n_strides*stride)
-        if isfile("simulation_data/final_config_$(n_mono).txt")
-            mp.initialize_poly!(polymers[i_temp],"simulation_data/final_config_$(n_mono).txt")
-        else
-            mp.initialize_poly!(polymers[i_temp])
-        end
+        #if isfile("simulation_data/final_config_$(n_mono).txt")
+        #    mp.initialize_poly!(polymers[i_temp],"simulation_data/final_config_$(n_mono).txt")
+        #else
+        mp.initialize_poly!(polymers[i_temp])
+        #end
     end 
 
     polymers_2 = Array{mp.Magnetic_polymer}(undef, n_temps)
@@ -467,12 +468,12 @@ function Qamhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::I
     for i_temp in 1:n_temps
         polymers_2[i_temp] = mp.Magnetic_polymer(n_mono)#, inv_temps[i_temp], spins_coupling, alpha)
         trajs_2[i_temp] = mp.MC_data(n_strides*stride)
-        if isfile("simulation_data/final_config_$(n_mono).txt")
-            mp.initialize_poly!(polymers_2[i_temp],"simulation_data/final_config_$(n_mono).txt")
-        else
-            println("scratch initialization")
-            mp.initialize_poly!(polymers_2[i_temp])
-        end
+        #if isfile("simulation_data/final_config_$(n_mono).txt")
+        #    mp.initialize_poly!(polymers_2[i_temp],"simulation_data/final_config_$(n_mono).txt")
+        #else
+        println("scratch initialization")
+        mp.initialize_poly!(polymers_2[i_temp])
+        #end
     end 
 
     
@@ -485,7 +486,7 @@ function Qamhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::I
     theta = zeros(n_feats+1)
     trial_theta = zeros(n_feats+1)
     theta .= initial_theta
-    if theta[n_feats+1] <= 0 || theta[n_feats+1] > 1
+    if theta[n_feats+1] <= 0 
         theta[n_feats+1] = 0.5
     end
 
@@ -495,10 +496,10 @@ function Qamhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::I
     end
     #############################################################
     
-
+    mp.set_spins!(polymers_2, data_spins[1,:])
     for i_eq in 1:500
         mp.MMC_run!(polymers,  trajs,  n_strides,stride,inv_temps, theta[n_feats+1], fields)  #theta[n_feats+1] is the spin coupling
-        mp.MMC_run!(polymers_2,trajs_2,n_strides,stride,inv_temps, theta[n_feats+1], fields)  #theta[n_feats+1] is the spin coupling
+        mp.MMC_run!(polymers_2,trajs_2,n_strides,stride,inv_temps, theta[n_feats+1], fields, true)  #theta[n_feats+1] is the spin coupling
         if i_eq%10 == 0
             println(i_eq)
         end
@@ -647,12 +648,12 @@ function generate_data(features_file::String, n_strides::Int, weights::Array{Flo
     n_mono = size(features, 1)
     n_feats = size(features, 2)
 
-    spins_coupling = 0.95
+    spins_coupling = 1.1
     #inv_temps = [1.0, 0.9, 0.8, 0.74, 0.65, 0.62, 0.6, 0.55, 0.5, 0.4]
     #inv_temps = [1.0, 0.94, 0.89, 0.85, 0.79, 0.77, 0.75, 0.71, 0.67, 0.57]
-    inv_temps = [1.0, 0.96, 0.92, 0.89, 0.85, 0.83, 0.82, 0.79, 0.75, 0.67]
+    inv_temps = [1.0, 0.96, 0.92, 0.89, 0.85, 0.83, 0.82, 0.79, 0.75, 0.67, 0.57, 0.5, 0.4]
     n_temps = length(inv_temps)
-    stride = 500
+    stride = 100
 
     polymers = Array{mp.Magnetic_polymer}(undef, n_temps)
     trajs = Array{mp.MC_data}(undef, n_temps)
@@ -674,12 +675,12 @@ function generate_data(features_file::String, n_strides::Int, weights::Array{Flo
     #mp.set_fields!(polymers, fields)
     
     #here I run the simulation for a while in order to equilibrate the chain
-    for i_burnin in 1:10
+    for i_burnin in 1:100
         println("burnin number: ", i_burnin)
         mp.MMC_run!(polymers, trajs, n_strides, stride, inv_temps, spins_coupling, fields)
     end
     
-    n_data = 60
+    n_data = 15
     summary_stats = zeros(n_feats,n_data)
     spins_conf = zeros(Int,n_mono,n_data)
     
@@ -700,16 +701,16 @@ function generate_data(features_file::String, n_strides::Int, weights::Array{Flo
     #compute_summary_stats!(summary_stats,spins_conf,features)
     #println(summary_stats)
     #println(spins_conf)
-    open("saw_conf_data_H3K27me3_ChIPSeq_2.txt","w") do io
-        writedlm(io,transpose(weights))
+    open("saw_conf_data.txt","w") do io
+        writedlm(io,transpose([weights; spins_coupling]))
         writedlm(io,transpose(spins_conf))
     end
     #=open("data_file.txt","w") do io
         writedlm(io,transpose(weights))
         writedlm(io,transpose(summary_stats))
     end=#
-    open("poly_confs_H3K27me3_ChIPSeq_2.txt","w") do io
-        writedlm(io,transpose(weights))
+    open("poly_confs.txt","w") do io
+        writedlm(io,transpose([weights; spins_coupling]))
         writedlm(io, poly_confs)
     end
 

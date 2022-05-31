@@ -331,7 +331,7 @@ end
 function spins_MC!(pol::Magnetic_polymer, n_flips::Int, ff::Array{Float64}, s::Array{Int}, near::Array{Int,2}, J::Float64, inv_temp::Float64)
     delta_tot = 0.0
     delta_tot_J = 0.0
-    for i_flip in 1:n_flips
+    for i_flip in 1:cld(n_flips,20)
         flip_candidate = rand(1:pol.n_mono)
         local_ene_J = 0.0
         local_ene = -ff[flip_candidate] * s[flip_candidate]
@@ -411,10 +411,10 @@ function MC_run_base!(pol::Magnetic_polymer, traj::MC_data, start::Int, finish::
     for i_step in (start+1):finish
         pivot = rand(2:pol.n_mono-1)
         p_move = rand(1:47)
-        if i_step%50000 == 0
-            println("Pivot: ", pivot)
-            println("Attmpted move: ", p_move)
-            println("step number: ", i_step, "\n")
+        if i_step%1000 == 0
+            println("step number: ", i_step)
+            println("Inv_temp: ", inv_temp)
+            println("Acceptance: ", n_acc/(i_step-start), "\n")
         end
         try_pivot!(pivot, p_move, pol.coord, pol.trial_coord, pol.n_mono)
         still_saw = checksaw!(pivot, pol, hash_base)
@@ -434,7 +434,7 @@ function MC_run_base!(pol::Magnetic_polymer, traj::MC_data, start::Int, finish::
         end
 
 
-        for i_local in 1:pol.n_mono
+        for i_local in 1:cld(pol.n_mono, 20)
             mv = rand(1:4)
             if mv==1
                 single_bead_flip!(pol.trial_coord,pol.hash_saw,pol.n_mono,hash_base)
@@ -531,10 +531,10 @@ function MC_run_save!(pol::Magnetic_polymer, traj::MC_data, start::Int, finish::
     for i_step in (start+1):min(finish,sample_lag*n_samples)
         pivot = rand(2:pol.n_mono-1)
         p_move = rand(1:47)
-        if i_step%50000 == 0
-            println("Pivot: ", pivot)
-            println("Attmpted move: ", p_move)
-            println("step number: ", i_step, "\n")
+        if i_step%1000 == 0
+            println("step number: ", i_step)
+            println("Inv_temp: ", inv_temp)
+            println("Acceptance: ", n_acc/(i_step-start), "\n")
         end
         try_pivot!(pivot, p_move, pol.coord, pol.trial_coord, pol.n_mono)
         still_saw = checksaw!(pivot, pol, hash_base)
@@ -554,7 +554,7 @@ function MC_run_save!(pol::Magnetic_polymer, traj::MC_data, start::Int, finish::
         end
 
 
-        for i_local in 1:pol.n_mono
+        for i_local in 1:cld(pol.n_mono, 20)
             mv = rand(1:4)
             if mv==1
                 single_bead_flip!(pol.trial_coord,pol.hash_saw,pol.n_mono,hash_base)
@@ -651,10 +651,10 @@ function MC_run_save!(pol::Magnetic_polymer, traj::MC_data, start::Int, finish::
     for i_step in (start+1):min(finish,sample_lag*n_samples)
         pivot = rand(2:pol.n_mono-1)
         p_move = rand(1:47)
-        if i_step%50000 == 0
-            println("Pivot: ", pivot)
-            println("Attmpted move: ", p_move)
-            println("step number: ", i_step, "\n")
+        if i_step%1000 == 0
+            println("step number: ", i_step)
+            println("Inv_temp: ", inv_temp)
+            println("Acceptance: ", n_acc/(i_step-start), "\n")
         end
         try_pivot!(pivot, p_move, pol.coord, pol.trial_coord, pol.n_mono)
         still_saw = checksaw!(pivot, pol, hash_base)
@@ -674,7 +674,7 @@ function MC_run_save!(pol::Magnetic_polymer, traj::MC_data, start::Int, finish::
         end
 
 
-        for i_local in 1:pol.n_mono
+        for i_local in 1:cld(pol.n_mono, 20)
             mv = rand(1:4)
             if mv==1
                 single_bead_flip!(pol.trial_coord,pol.hash_saw,pol.n_mono,hash_base)
