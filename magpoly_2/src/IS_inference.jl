@@ -88,42 +88,40 @@ end
 # This function generates samples from the posterior distribution of the weights
 # Assuming that the data were generated with zero spins coupling i.e. a logistic regression problem
 # The sampling is done with a simple metroplis hastings sampler.
-function vanilla_sampler(n_samples::Int, data_file::String, features_file::String)
-    io = open(data_file,"r")
-    data_spins = readdlm(io, Int64; header=true)[1]
-    close(io)
-    n_mono = size(data_spins, 2)
-    n_data = size(data_spins, 1)
-    println(n_mono)
-    println(n_data)
-    println(typeof(data_spins))
-
+function vanilla_sampler(n_samples::Int, delta_w::Float64, initial_weights::Array{Float64}, features_file::String, data_file::String)
     io = open(features_file, "r")
     features = readdlm(io,Float64)
     close(io)
     n_mono = size(features, 1)
     n_feats = size(features, 2)
+    println("Number of features: " ,n_feats)
 
-    weights_series = zeros(n_samples,2)
+    # Read generated data. In this algo they're not summary stats but the full data!
+    io = open(data_file,"r")
+    data_spins = readdlm(io, Int64; header=true)[1][1:end,:]
+    close(io)
+    n_data = size(data_spins, 1)
+    println(n_mono)
+    println(n_data)
+    println(typeof(data_spins))
+
+    weights_series = zeros(n_feats, n_samples)
     energies = zeros(n_samples)
 
-    w_std = 3.0
     weights = zeros(n_feats)
     trial_weights = zeros(n_feats)
-    weights = randn(2) .* w_std  # vector of gaussian numbers with standard deviation = w_std
-    weights_series[1,:] .= weights
-    delta_w = 0.1
+    weights .= initial_weights
+    weights_series[:,1] .= weights
 
     fields = zeros(n_mono)
     for i in 1:n_feats
         fields .+= features[:,i] .* weights[i]
     end
 
-    #energy = -0.5*(weights[1]^2 + weights[2]^2)/(w_std^2)  # prior contribution
     energy = 0.0
     for i_data in 1:n_data
         for i_mono in 1:n_mono
-            energy += data_spins[i_data, i_mono]*fields[i_mono]*0.5 - log(1+exp(0.5*fields[i_mono]))
+            energy += data_spins[i_data, i_mono]*fields[i_mono] - log(1+exp(fields[i_mono]))
         end
     end
     energies[1] = energy
@@ -132,7 +130,7 @@ function vanilla_sampler(n_samples::Int, data_file::String, features_file::Strin
     n_acc = 0
 
     for i_sample in 2:n_samples
-        trial_weights .= weights .+ randn(2).* delta_w
+        trial_weights .= weights .+ randn(n_feats) .* delta_w
         fields = zeros(n_mono)
         for i in 1:n_feats
             fields .+= features[:,i] .* trial_weights[i]
@@ -142,7 +140,7 @@ function vanilla_sampler(n_samples::Int, data_file::String, features_file::Strin
         trial_energy = 0.0
         for i_data in 1:n_data
             for i_mono in 1:n_mono
-                trial_energy += data_spins[i_data, i_mono]*fields[i_mono]*0.5 - log(1+exp(0.5*fields[i_mono]))
+                trial_energy += data_spins[i_data, i_mono]*fields[i_mono] - log(1+exp(fields[i_mono]))
             end
         end
 
@@ -152,9 +150,10 @@ function vanilla_sampler(n_samples::Int, data_file::String, features_file::Strin
 
         if i_sample%1000 == 0
             println(i_sample)
-            println("w1: ",weights[1]," ---> ",trial_weights[1])
-            println("w2: ",weights[2]," ---> ",trial_weights[2])
-            println("delta_syn_like: ", delta_energy)
+            for i_feat in 1:n_feats
+                println("w$(i_feat): ",weights[i_feat]," ---> ",trial_weights[i_feat])
+            end
+            println("delta_energy: ", delta_energy)
             println("acceptance: ", w_acceptance)
         end
 
@@ -165,17 +164,46 @@ function vanilla_sampler(n_samples::Int, data_file::String, features_file::Strin
         end
 
         energies[i_sample] = energy
-        weights_series[i_sample,:] .= weights
+        weights_series[:, i_sample] .= weights
     end
 
     println("Acceptance fraction: ", n_acc/(n_samples-1))
 
     !isdir("IS_data") && mkdir("IS_data")
-    open("IS_data/weights.txt", "w") do io
+    open("IS_data/weights$(n_data)_$(delta_w).txt", "w") do io
         writedlm(io, weights_series)
     end
-    open("IS_data/neg_energies.txt", "w") do io
+    open("IS_data/neg_energies$(n_data)_$(delta_w).txt", "w") do io
         writedlm(io, energies)
+    end
+end
+
+function generate_spin_confs(features_file::String, n_data::Int, weights::Array{Float64})
+    io = open(features_file, "r")
+    features = readdlm(io,Float64)
+    close(io)
+    n_mono = size(features, 1)
+    n_feats = size(features, 2)
+    fields = zeros(n_mono)
+    for i in 1:n_feats
+        fields .+= features[:,i] .* weights[i]
+    end
+    proba = zeros(n_mono)
+    for i in 1:n_mono
+        proba[i] = exp(fields[i]) / (1 + exp(fields[i]))
+    end
+    spins_conf = zeros(Int, n_mono, n_data)
+    for i_data in 1:n_data
+        for i_mono in 1:n_mono
+            if rand() <= proba[i_mono]
+                spins_conf[i_mono, i_data] = 1
+            end
+        end
+    end
+
+    open("LR_saw_conf_data_1.txt", "w") do io
+        writedlm(io,transpose([weights]))
+        writedlm(io,transpose(spins_conf))
     end
 end
 

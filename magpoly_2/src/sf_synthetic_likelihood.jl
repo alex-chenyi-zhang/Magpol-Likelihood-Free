@@ -648,9 +648,9 @@ function generate_data(features_file::String, n_strides::Int, weights::Array{Flo
     n_mono = size(features, 1)
     n_feats = size(features, 2)
 
-    spins_coupling = 1.1
-    #inv_temps = [1.0, 0.9, 0.8, 0.74, 0.65, 0.62, 0.6, 0.55, 0.5, 0.4]
-    #inv_temps = [1.0, 0.94, 0.89, 0.85, 0.79, 0.77, 0.75, 0.71, 0.67, 0.57]
+    spins_coupling = 1.25
+    #inv_temps = [10000.0, 0.9, 0.8, 0.74, 0.65, 0.62, 0.6, 0.55, 0.5, 0.4]
+    #inv_temps = [0.01, 0.01]
     inv_temps = [1.0, 0.96, 0.92, 0.89, 0.85, 0.83, 0.82, 0.79, 0.75, 0.67, 0.57, 0.5, 0.4]
     n_temps = length(inv_temps)
     stride = 100
@@ -675,12 +675,12 @@ function generate_data(features_file::String, n_strides::Int, weights::Array{Flo
     #mp.set_fields!(polymers, fields)
     
     #here I run the simulation for a while in order to equilibrate the chain
-    for i_burnin in 1:100
+    for i_burnin in 1:50
         println("burnin number: ", i_burnin)
         mp.MMC_run!(polymers, trajs, n_strides, stride, inv_temps, spins_coupling, fields)
     end
     
-    n_data = 15
+    n_data = 500
     summary_stats = zeros(n_feats,n_data)
     spins_conf = zeros(Int,n_mono,n_data)
     
@@ -697,11 +697,21 @@ function generate_data(features_file::String, n_strides::Int, weights::Array{Flo
         for j in 1:3
             poly_confs[(i_data-1)*3+j,:] .= polymers[1].coord[j,:]
         end
+        if i_data%10 == 0
+            open("saw_conf_data_prova.txt","w") do io
+                writedlm(io,transpose([weights; spins_coupling]))
+                writedlm(io,transpose(spins_conf))
+            end
+            open("poly_confs_prova.txt","w") do io
+                writedlm(io,transpose([weights; spins_coupling]))
+                writedlm(io, poly_confs)
+            end
+        end
     end
     #compute_summary_stats!(summary_stats,spins_conf,features)
     #println(summary_stats)
     #println(spins_conf)
-    open("saw_conf_data.txt","w") do io
+    open("saw_conf_data_prova.txt","w") do io
         writedlm(io,transpose([weights; spins_coupling]))
         writedlm(io,transpose(spins_conf))
     end
@@ -709,7 +719,7 @@ function generate_data(features_file::String, n_strides::Int, weights::Array{Flo
         writedlm(io,transpose(weights))
         writedlm(io,transpose(summary_stats))
     end=#
-    open("poly_confs.txt","w") do io
+    open("poly_confs_prova.txt","w") do io
         writedlm(io,transpose([weights; spins_coupling]))
         writedlm(io, poly_confs)
     end

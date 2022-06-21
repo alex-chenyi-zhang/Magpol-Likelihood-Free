@@ -463,6 +463,8 @@ function MC_run_base!(pol::Magnetic_polymer, traj::MC_data, start::Int, finish::
             end
             energy = trial_energy
             n_acc += 1
+           # println(delta_energy, "   " ,acc )
+
         end
         
         if !quenched_spins
