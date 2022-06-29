@@ -201,7 +201,7 @@ function generate_spin_confs(features_file::String, n_data::Int, weights::Array{
         end
     end
 
-    open("LR_saw_conf_data_1.txt", "w") do io
+    open("LR_saw_conf_data_test.txt", "w") do io
         writedlm(io,transpose([weights]))
         writedlm(io,transpose(spins_conf))
     end
