@@ -1,10 +1,10 @@
-using Random, Distributions, DelimitedFiles
+using Random, Distributions, DelimitedFiles, StaticArrays
 Random.seed!()
 
 # Here I define the global quantities used by all pivot MCMC run which are the pivot moves
 const pivot_moves = Array{Int,3}(zeros(47, 2, 3)) # Tensor that defines all the pivot moves of the octahedral symmetry group
-const perms = [[1 2 3]; [1 3 2]; [2 1 3]; [2 3 1]; [3 1 2]; [3 2 1]]
-const tr_signs = [[1 1 1]; [1 1 -1]; [1 -1 1]; [1 -1 -1]; [-1 1 1]; [-1 1 -1]; [-1 -1 1]; [-1 -1 -1]]
+const perms = @SMatrix [[1 2 3]; [1 3 2]; [2 1 3]; [2 3 1]; [3 1 2]; [3 2 1]]
+const tr_signs = @SMatrix [[1 1 1]; [1 1 -1]; [1 -1 1]; [1 -1 -1]; [-1 1 1]; [-1 1 -1]; [-1 -1 1]; [-1 -1 -1]]
 p_moves_count = 1
 for i in 1:6
     for j in 1:8
@@ -120,6 +120,10 @@ function try_pivot!(k::Int, move::Int, coo::Array{Int,2}, t_coo::Array{Int,2}, n
             t_coo[j, i_mono] = coo[j, i_mono]
         end
     end
+
+    #t_coo[:,1:k] .= coo[:,1:k]
+    
+    
     for i_mono in k+1:n_mono
         for j in 1:3
             t_coo[j,i_mono] = (pivot_moves[move,2,j]*(coo[pivot_moves[move,1,j],i_mono]
@@ -378,11 +382,12 @@ end
 
 function MC_run_base!(pol::Magnetic_polymer, traj::MC_data, start::Int, finish::Int, inv_temp::Float64, 
                 J::Float64, fields::Array{Float64}, quenched_spins::Bool=false)
-    for i_mono in 1:pol.n_mono
-        for j in 1:3
-            pol.trial_coord[j,i_mono] = pol.coord[j,i_mono]
-        end
-    end 
+    #for i_mono in 1:pol.n_mono
+    #    for j in 1:3
+    #        pol.trial_coord[j,i_mono] = pol.coord[j,i_mono]
+    #    end
+    #end 
+    pol.trial_coord .= pol.coord
     new_coord1 = zeros(Int,3)
     new_coord2 = zeros(Int,3)
     n_acc = 0
@@ -423,10 +428,11 @@ function MC_run_base!(pol::Magnetic_polymer, traj::MC_data, start::Int, finish::
         # If the pivot move was unsuccessful try next move on the previous configuration
         if !still_saw
             empty!(pol.hash_saw)
+            pol.trial_coord .= pol.coord
             for i_mono in 1:pol.n_mono
-                for j in 1:3
-                    pol.trial_coord[j,i_mono] = pol.coord[j,i_mono]
-                end
+                #for j in 1:3
+                #    pol.trial_coord[j,i_mono] = pol.coord[j,i_mono]
+                #end
                 pol.hash_saw[pol.trial_coord[1,i_mono]*hash_base^2+pol.trial_coord[2,i_mono]*hash_base+pol.trial_coord[3,i_mono]] = i_mono
             end
         else
@@ -456,11 +462,13 @@ function MC_run_base!(pol::Magnetic_polymer, traj::MC_data, start::Int, finish::
                     pol.coord[j,i_mono] = pol.trial_coord[j,i_mono]
                 end
             end
+            #pol.coord .= pol.trial_coord
             for i_mono in 1:pol.n_mono
                 for j in 1:7
                     pol.neighbours[j,i_mono] = pol.trial_neighbours[j,i_mono]
                 end
             end
+            #pol.neighbours .= pol.trial_neighbours
             energy = trial_energy
             n_acc += 1
            # println(delta_energy, "   " ,acc )
@@ -472,9 +480,9 @@ function MC_run_base!(pol::Magnetic_polymer, traj::MC_data, start::Int, finish::
             energy += delta_ene
         end
 
-        traj.rg2[i_step] = gyration_radius_squared(pol)
-        traj.magnetization[i_step] = mean(pol.spins)
-        traj.energies[i_step] = energy
+        #traj.rg2[i_step] = gyration_radius_squared(pol)
+        #traj.magnetization[i_step] = mean(pol.spins)
+        #traj.energies[i_step] = energy
 
         # This next if ... end can be removed. I kept as a sanity check in an early stage 
         # when I had problems with the computation of the nearest neighbours
@@ -747,7 +755,7 @@ function MMC_run_base!(polymers::Array{Magnetic_polymer}, trajs::Array{MC_data},
     accepted_swaps = 0
     temp_coord = zeros(Int,3)
 
-    for i_temp in 1:n_temps
+    Threads.@threads for i_temp in 1:n_temps
         MC_run!(polymers[i_temp], trajs[i_temp],1,stride, inv_temps[i_temp], J, fields, quenched_spins)
     end
 
@@ -770,7 +778,7 @@ function MMC_run_base!(polymers::Array{Magnetic_polymer}, trajs::Array{MC_data},
             accepted_swaps += 1
         end
 
-        for i_temp in 1:n_temps
+        Threads.@threads for i_temp in 1:n_temps
             MC_run!(polymers[i_temp], trajs[i_temp],(i_strides-1)*stride+1,i_strides*stride, inv_temps[i_temp], J, fields, quenched_spins)
         end
     end
@@ -786,7 +794,7 @@ function MMC_run_save!(polymers::Array{Magnetic_polymer}, trajs::Array{MC_data},
     MC_run!(polymers[1], trajs[1],1,stride, spins_configs,sample_lag, n_samples, inv_temps[1], J, fields, quenched_spins)
     # Only the lowest temperature is the system we're using for our likelihood approx
     # the chains at higher temps are only used to "fluidify" the chain of interest
-    for i_temp in 2:n_temps
+    Threads.@threads for i_temp in 2:n_temps
         MC_run!(polymers[i_temp], trajs[i_temp],1,stride, sample_lag, n_samples, inv_temps[i_temp], J, fields, quenched_spins)
     end
 
@@ -816,7 +824,7 @@ function MMC_run_save!(polymers::Array{Magnetic_polymer}, trajs::Array{MC_data},
         MC_run!(polymers[1], trajs[1],(i_strides-1)*stride+1,i_strides*stride, spins_configs,sample_lag, n_samples, inv_temps[1], J, fields, quenched_spins)
         # Only the lowest temperature is the system we're using for our likelihood approx
         # the chains at higher temps are only used to "fluidify" the chain of interest
-        for i_temp in 2:n_temps
+        Threads.@threads for i_temp in 2:n_temps
             MC_run!(polymers[i_temp], trajs[i_temp],(i_strides-1)*stride+1,i_strides*stride, sample_lag, n_samples, inv_temps[i_temp], J, fields, quenched_spins)
         end
     end
@@ -833,7 +841,7 @@ function MMC_run_save!(polymers::Array{Magnetic_polymer}, trajs::Array{MC_data},
     MC_run!(polymers[1], trajs[1],1,stride, spins_configs, ising_energies, sample_lag, n_samples, inv_temps[1], J, fields, quenched_spins)
     # Only the lowest temperature is the system we're using for our likelihood approx
     # the chains at higher temps are only used to "fluidify" the chain of interest
-    for i_temp in 2:n_temps
+    Threads.@threads for i_temp in 2:n_temps
         MC_run!(polymers[i_temp], trajs[i_temp],1,stride, sample_lag, n_samples, inv_temps[i_temp], J, fields, quenched_spins)
     end
 
@@ -862,7 +870,7 @@ function MMC_run_save!(polymers::Array{Magnetic_polymer}, trajs::Array{MC_data},
         MC_run!(polymers[1], trajs[1],(i_strides-1)*stride+1,i_strides*stride, spins_configs, ising_energies, sample_lag, n_samples, inv_temps[1], J, fields, quenched_spins)
         # Only the lowest temperature is the system we're using for our likelihood approx
         # the chains at higher temps are only used to "fluidify" the chain of interest
-        for i_temp in 2:n_temps
+        Threads.@threads for i_temp in 2:n_temps
             MC_run!(polymers[i_temp], trajs[i_temp],(i_strides-1)*stride+1,i_strides*stride, sample_lag, n_samples, inv_temps[i_temp], J, fields, quenched_spins)
         end
     end
