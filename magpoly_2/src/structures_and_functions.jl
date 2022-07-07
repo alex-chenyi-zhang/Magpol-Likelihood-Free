@@ -416,11 +416,11 @@ function MC_run_base!(pol::Magnetic_polymer, traj::MC_data, start::Int, finish::
     for i_step in (start+1):finish
         pivot = rand(2:pol.n_mono-1)
         p_move = rand(1:47)
-        if i_step%1000 == 0
+        #=if i_step%1000 == 0
             println("step number: ", i_step)
             println("Inv_temp: ", inv_temp)
             println("Acceptance: ", n_acc/(i_step-start), "\n")
-        end
+        end=#
         try_pivot!(pivot, p_move, pol.coord, pol.trial_coord, pol.n_mono)
         still_saw = checksaw!(pivot, pol, hash_base)
 
@@ -541,11 +541,11 @@ function MC_run_save!(pol::Magnetic_polymer, traj::MC_data, start::Int, finish::
     for i_step in (start+1):min(finish,sample_lag*n_samples)
         pivot = rand(2:pol.n_mono-1)
         p_move = rand(1:47)
-        if i_step%1000 == 0
+        #=if i_step%1000 == 0
             println("step number: ", i_step)
             println("Inv_temp: ", inv_temp)
             println("Acceptance: ", n_acc/(i_step-start), "\n")
-        end
+        end=#
         try_pivot!(pivot, p_move, pol.coord, pol.trial_coord, pol.n_mono)
         still_saw = checksaw!(pivot, pol, hash_base)
 
@@ -661,11 +661,11 @@ function MC_run_save!(pol::Magnetic_polymer, traj::MC_data, start::Int, finish::
     for i_step in (start+1):min(finish,sample_lag*n_samples)
         pivot = rand(2:pol.n_mono-1)
         p_move = rand(1:47)
-        if i_step%1000 == 0
+        #=if i_step%1000 == 0
             println("step number: ", i_step)
             println("Inv_temp: ", inv_temp)
             println("Acceptance: ", n_acc/(i_step-start), "\n")
-        end
+        end=#
         try_pivot!(pivot, p_move, pol.coord, pol.trial_coord, pol.n_mono)
         still_saw = checksaw!(pivot, pol, hash_base)
 

@@ -641,14 +641,15 @@ end
 #####################################################################################
 #####################################################################################
 
-function generate_data(features_file::String, n_strides::Int, weights::Array{Float64})
+function generate_data(n_data::Int, features_file::String, n_strides::Int, weights::Array{Float64}, spins_coupling::Float64)
     io = open(features_file, "r")
     features = readdlm(io,Float64)
     close(io)
     n_mono = size(features, 1)
     n_feats = size(features, 2)
 
-    spins_coupling = 1.25
+    #spins_coupling = 1.25
+    println(spins_coupling, weights)
     #inv_temps = [10000.0, 0.9, 0.8, 0.74, 0.65, 0.62, 0.6, 0.55, 0.5, 0.4]
     #inv_temps = [0.01, 0.01]
     inv_temps = [1.0, 0.96, 0.92, 0.89, 0.85, 0.83, 0.82, 0.79, 0.75, 0.67, 0.57, 0.5, 0.4]
@@ -680,7 +681,7 @@ function generate_data(features_file::String, n_strides::Int, weights::Array{Flo
         mp.MMC_run!(polymers, trajs, n_strides, stride, inv_temps, spins_coupling, fields)
     end
     
-    n_data = 500
+    #n_data = 500
     summary_stats = zeros(n_feats,n_data)
     spins_conf = zeros(Int,n_mono,n_data)
     
@@ -726,5 +727,92 @@ function generate_data(features_file::String, n_strides::Int, weights::Array{Flo
 
 
     mp.write_results(polymers[1])
+end
+
+## The previous function generates samples from the likelihood with a fixed set of parameters e.g. MAP estimates
+## This one generates samples from the posterior predictive or bayesian predictive distribution
+
+function generate_data_posterior_predictive(features_file::String, n_strides::Int, n_data_per_param::Int, param_file::String)
+    io = open(features_file, "r")
+    features = readdlm(io,Float64)
+    close(io)
+    n_mono = size(features, 1)
+    n_feats = size(features, 2)
+
+    io = open(param_file, "r")
+    post_samples = readdlm(io, Float64)
+    close(io)
+    n_param = size(post_samples, 2)
+    println(post_samples[:,1])
+    
+
+    inv_temps = [1.0, 0.96, 0.92, 0.89, 0.85, 0.83, 0.82, 0.79, 0.75, 0.67, 0.57, 0.5, 0.4]
+    n_temps = length(inv_temps)
+    stride = 100
+
+    n_data = n_data_per_param * n_param
+
+    spins_conf = zeros(Int,n_mono,n_data) 
+    poly_confs = zeros(Int,n_data*3,n_mono)
+
+    polymers = Array{mp.Magnetic_polymer}(undef, n_temps)
+    trajs = Array{mp.MC_data}(undef, n_temps)
+    for i_temp in 1:n_temps
+        polymers[i_temp] = mp.Magnetic_polymer(n_mono)#, inv_temps[i_temp], spins_coupling, alpha)
+        trajs[i_temp] = mp.MC_data(n_strides*stride)
+        mp.initialize_poly!(polymers[i_temp])
+    end 
+
+    ###################################################################
+
+    fields = zeros(n_mono)
+    for i in 1:n_feats
+        fields .+= features[:,i] .* post_samples[i,1]
+    end
+    #mp.set_fields!(polymers, fields)
+    
+    #here I run the simulation for a while in order to equilibrate the chain
+    for i_burnin in 1:15
+        println("burnin number: ", i_burnin)
+        mp.MMC_run!(polymers, trajs, n_strides, stride, inv_temps, post_samples[n_feats+1,1], fields)
+    end
+
+    ###################################################################
+
+    for i_param in 1:n_param
+        println("I_PARAM: ", i_param)
+        println(post_samples[:,i_param])
+        fields = zeros(n_mono)
+        for i in 1:n_feats
+            fields .+= features[:,i] .* post_samples[i,i_param]
+        end
+        # when changing parameters short equilibration run
+        for i_burnin in 1:5
+            println("burnin number: ", i_burnin)
+            mp.MMC_run!(polymers, trajs, n_strides, stride, inv_temps, post_samples[n_feats+1,i_param], fields)
+        end
+
+        for i_data in 1:n_data_per_param
+            println(i_data)
+            mp.MMC_run!(polymers, trajs, n_strides, stride, inv_temps, post_samples[n_feats+1,i_param], fields)
+            #mp.write_results(polymers[1],trajs[1])
+            spins_conf[:,i_data + (i_param-1)*n_data_per_param] .= polymers[1].spins
+            for j in 1:3
+                poly_confs[(i_data + (i_param-1)*n_data_per_param-1)*3+j,:] .= polymers[1].coord[j,:]
+            end
+        end
+    end
+
+    open("saw_conf_$(param_file)","w") do io
+        #writedlm(io,transpose([weights; spins_coupling]))
+        writedlm(io,transpose(spins_conf))
+    end
+    
+    open("poly_confs_$(param_file)","w") do io
+        #writedlm(io,transpose([weights; spins_coupling]))
+        writedlm(io, poly_confs)
+    end
+
+
 end
 
