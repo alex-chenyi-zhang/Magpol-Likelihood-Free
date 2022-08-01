@@ -148,7 +148,7 @@ function vanilla_sampler(n_samples::Int, delta_w::Float64, initial_weights::Arra
         delta_energy >=0 ? w_acceptance=1 : w_acceptance=exp(delta_energy)
 
 
-        if i_sample%1000 == 0
+        if i_sample%100 == 0
             println(i_sample)
             for i_feat in 1:n_feats
                 println("w$(i_feat): ",weights[i_feat]," ---> ",trial_weights[i_feat])
@@ -201,9 +201,45 @@ function generate_spin_confs(features_file::String, n_data::Int, weights::Array{
         end
     end
 
-    open("LR_saw_conf_data_test.txt", "w") do io
+    open("saw_conf_post_LR_R2_MAP.txt", "w") do io
         writedlm(io,transpose([weights]))
         writedlm(io,transpose(spins_conf))
     end
+end
+
+function LR_posterior_predictive(features_file::String, param_file::String)
+    io = open(features_file, "r")
+    features = readdlm(io,Float64)
+    close(io)
+    n_mono = size(features, 1)
+    n_feats = size(features, 2)
+
+    io = open(param_file, "r")
+    post_samples = readdlm(io, Float64)
+    close(io)
+    n_param = size(post_samples, 2)
+    println(post_samples[:,1])
+
+    spins_conf = zeros(n_mono,n_param) 
+
+    for i_param in 1:n_param
+        println("I_PARAM: ", i_param)
+        println(post_samples[:,i_param])
+        fields = zeros(n_mono)
+        for i in 1:n_feats
+            fields .+= features[:,i] .* post_samples[i,i_param]
+        end
+        proba = zeros(n_mono)
+        for i in 1:n_mono
+            proba[i] = exp(fields[i]) / (1 + exp(fields[i]))
+        end
+        spins_conf[:,i_param] .= proba
+    end
+
+    open("saw_conf_$(param_file)","w") do io
+        #writedlm(io,transpose([weights; spins_coupling]))
+        writedlm(io,transpose(spins_conf))
+    end
+    
 end
 

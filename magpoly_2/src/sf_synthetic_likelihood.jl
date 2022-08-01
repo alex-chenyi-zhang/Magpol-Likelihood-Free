@@ -651,8 +651,8 @@ function generate_data(n_data::Int, features_file::String, n_strides::Int, weigh
     #spins_coupling = 1.25
     println(spins_coupling, weights)
     #inv_temps = [10000.0, 0.9, 0.8, 0.74, 0.65, 0.62, 0.6, 0.55, 0.5, 0.4]
-    #inv_temps = [0.01, 0.01]
-    inv_temps = [1.0, 0.96, 0.92, 0.89, 0.85, 0.83, 0.82, 0.79, 0.75, 0.67, 0.57, 0.5, 0.4]
+    inv_temps = [5, 0.01]
+    #inv_temps = [1.0, 0.96, 0.92, 0.89, 0.85, 0.83, 0.82, 0.79, 0.75, 0.67, 0.57, 0.5, 0.4]
     n_temps = length(inv_temps)
     stride = 100
 
@@ -751,6 +751,7 @@ function generate_data_posterior_predictive(features_file::String, n_strides::In
     stride = 100
 
     n_data = n_data_per_param * n_param
+    println(n_data)
 
     spins_conf = zeros(Int,n_mono,n_data) 
     poly_confs = zeros(Int,n_data*3,n_mono)
@@ -772,7 +773,7 @@ function generate_data_posterior_predictive(features_file::String, n_strides::In
     #mp.set_fields!(polymers, fields)
     
     #here I run the simulation for a while in order to equilibrate the chain
-    for i_burnin in 1:15
+    for i_burnin in 1:2
         println("burnin number: ", i_burnin)
         mp.MMC_run!(polymers, trajs, n_strides, stride, inv_temps, post_samples[n_feats+1,1], fields)
     end
@@ -787,7 +788,7 @@ function generate_data_posterior_predictive(features_file::String, n_strides::In
             fields .+= features[:,i] .* post_samples[i,i_param]
         end
         # when changing parameters short equilibration run
-        for i_burnin in 1:5
+        for i_burnin in 1:1
             println("burnin number: ", i_burnin)
             mp.MMC_run!(polymers, trajs, n_strides, stride, inv_temps, post_samples[n_feats+1,i_param], fields)
         end
