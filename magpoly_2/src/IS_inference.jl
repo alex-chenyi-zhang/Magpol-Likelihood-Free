@@ -19,10 +19,10 @@ function generate_saw(n_samples::Int, samples_lag::Int)
         for j in 1:3
             pol.trial_coord[j,i_mono] = pol.coord[j,i_mono]
         end
-    end 
+    end
 
     hash_base = 2*n_mono +1
-    
+
     # equilibration of the chain
     for i in 1:burn_in
         pivot = rand(2:n_mono-1)
@@ -46,7 +46,7 @@ function generate_saw(n_samples::Int, samples_lag::Int)
 
     saw_configs = zeros(Int, n_samples, 3, n_mono)
 
-    for i in 1:n_steps 
+    for i in 1:n_steps
         pivot = rand(2:n_mono-1)
         p_move = rand(1:47)
         if i%10000 == 0
@@ -78,7 +78,7 @@ function generate_saw(n_samples::Int, samples_lag::Int)
     println("Fraction of accepted pivots: ", n_acc/n_steps)
 
     !isdir("SAW_data") && mkdir("SAW_data")
-    io = open("SAW_data/saw_configs.txt", "w") 
+    io = open("SAW_data/saw_configs.txt", "w")
     for i_sample in 1:n_samples
         writedlm(io, saw_configs[i_sample,:,:])
     end
@@ -90,7 +90,7 @@ end
 # The sampling is done with a simple metroplis hastings sampler.
 function vanilla_sampler(n_samples::Int, delta_w::Float64, initial_weights::Array{Float64}, features_file::String, data_file::String)
     io = open(features_file, "r")
-    features = readdlm(io,Float64)
+    features = readdlm(io,Float64)#[1601:end,:]
     close(io)
     n_mono = size(features, 1)
     n_feats = size(features, 2)
@@ -135,7 +135,7 @@ function vanilla_sampler(n_samples::Int, delta_w::Float64, initial_weights::Arra
         for i in 1:n_feats
             fields .+= features[:,i] .* trial_weights[i]
         end
-        
+
         #trial_energy = -0.5*(trial_weights[1]^2 + trial_weights[2]^2)/(w_std^2)
         trial_energy = 0.0
         for i_data in 1:n_data
@@ -170,20 +170,21 @@ function vanilla_sampler(n_samples::Int, delta_w::Float64, initial_weights::Arra
     println("Acceptance fraction: ", n_acc/(n_samples-1))
 
     !isdir("IS_data") && mkdir("IS_data")
-    open("IS_data/weights$(n_data)_$(delta_w).txt", "w") do io
+    open("IS_data/weights$(n_data)_$(delta_w)_uncoupled.txt", "w") do io
         writedlm(io, weights_series)
     end
-    open("IS_data/neg_energies$(n_data)_$(delta_w).txt", "w") do io
+    open("IS_data/neg_energies$(n_data)_$(delta_w)_uncoupled.txt", "w") do io
         writedlm(io, energies)
     end
 end
 
 function generate_spin_confs(features_file::String, n_data::Int, weights::Array{Float64})
     io = open(features_file, "r")
-    features = readdlm(io,Float64)
+    features = readdlm(io,Float64)#[1601:end,:]
     close(io)
     n_mono = size(features, 1)
     n_feats = size(features, 2)
+    println(n_mono)
     fields = zeros(n_mono)
     for i in 1:n_feats
         fields .+= features[:,i] .* weights[i]
@@ -201,7 +202,7 @@ function generate_spin_confs(features_file::String, n_data::Int, weights::Array{
         end
     end
 
-    open("saw_conf_post_LR_R2_MAP.txt", "w") do io
+    open("saw_conf_uncoupled.txt", "w") do io
         writedlm(io,transpose([weights]))
         writedlm(io,transpose(spins_conf))
     end
@@ -220,7 +221,7 @@ function LR_posterior_predictive(features_file::String, param_file::String)
     n_param = size(post_samples, 2)
     println(post_samples[:,1])
 
-    spins_conf = zeros(n_mono,n_param) 
+    spins_conf = zeros(n_mono,n_param)
 
     for i_param in 1:n_param
         println("I_PARAM: ", i_param)
@@ -236,10 +237,9 @@ function LR_posterior_predictive(features_file::String, param_file::String)
         spins_conf[:,i_param] .= proba
     end
 
-    open("saw_conf_$(param_file)","w") do io
+    open("saw_conf_predR2_$(param_file)","w") do io
         #writedlm(io,transpose([weights; spins_coupling]))
         writedlm(io,transpose(spins_conf))
     end
-    
-end
 
+end

@@ -19,7 +19,7 @@ end
 
 #####################################################################################
 # This is the structure for the parameter samples generated through synthetic likelihood
-struct SL_data{T1<:Int, T2<:Float64}  
+struct SL_data{T1<:Int, T2<:Float64}
     n_samples::T1
     n_params::T1
     param_values::T2
@@ -57,7 +57,7 @@ end=#
 
 
 function compute_summary_stats!(ss::Matrix{Float64}, sp_conf::Matrix{Int}, feats::Matrix{Float64})
-    n_s = size(ss,2) #number of samples 
+    n_s = size(ss,2) #number of samples
     n_m = size(sp_conf,1)
     n_feats = size(feats, 2)
     for i_sample in 1:n_s
@@ -108,9 +108,9 @@ function synthetic_likelihood_polymer(n_samples::Int, sample_lag::Int, stride::I
     n_temps = length(inv_temps)
 
     spins_configs = zeros(Int, n_mono, n_samples)
-    
-    
-    
+
+
+
     polymers = Array{mp.Magnetic_polymer}(undef, n_temps)
     trajs = Array{mp.MC_data}(undef, n_temps)
     for i_temp in 1:n_temps
@@ -121,7 +121,7 @@ function synthetic_likelihood_polymer(n_samples::Int, sample_lag::Int, stride::I
         else
             mp.initialize_poly!(polymers[i_temp])
         end
-    end 
+    end
 
     cov_mat = zeros(n_ss,n_ss)
     #inv_cov_mat = zeros(3,3)
@@ -154,13 +154,13 @@ function synthetic_likelihood_polymer(n_samples::Int, sample_lag::Int, stride::I
     for i_data in 1:n_data
         syn_like += log_synth_likelihood(cov_mat, ss_mean_series[:,1], data[i_data,:])
     end
-    
+
     param_series[1,1] = weights[1]
     param_series[2,1] = weights[2]
     param_series[3,1] = weights[3]
-    SL_series[1] = syn_like 
+    SL_series[1] = syn_like
     w_acceptance = 0.0
-    
+
     for i_param in 2:n_params
         #=trial_weights .= weights
         if rand((1,2))==1
@@ -168,10 +168,10 @@ function synthetic_likelihood_polymer(n_samples::Int, sample_lag::Int, stride::I
         else
             trial_weights[2] += (2*rand()-1)*delta_w
         end=#
-            
+
         trial_weights .= weights .+ (2 .* rand(n_feats) .-1) .*delta_w
-        
-        
+
+
         fields = zeros(n_mono)
         for i in 1:n_feats
             fields .+= features[:,i] .* trial_weights[i]
@@ -189,7 +189,7 @@ function synthetic_likelihood_polymer(n_samples::Int, sample_lag::Int, stride::I
         for i_data in 1:n_data
             trial_syn_like += log_synth_likelihood(cov_mat, ss_mean_series[:,i_param], data[i_data,:])
         end
-        
+
         delta_syn_like = trial_syn_like -syn_like
         delta_syn_like>=0 ? w_acceptance=1 : w_acceptance=exp(delta_syn_like)
         if i_param%10 == 0
@@ -213,7 +213,7 @@ function synthetic_likelihood_polymer(n_samples::Int, sample_lag::Int, stride::I
     end
     println("Acceptance ratio: ", accepted_moves/n_params)
 
-    
+
     !isdir("SL_data") && mkdir("SL_data")
     open("SL_data/weights.txt", "w") do io
         writedlm(io, param_series)
@@ -257,7 +257,7 @@ function amhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::In
 
     spins_configs = zeros(Int, n_mono, n_samples) # where you store the generated data
     ising_energies = zeros(n_samples)
-    
+
     ########################################################### Initialize some quantitites in this section
     polymers = Array{mp.Magnetic_polymer}(undef, n_temps)
     trajs = Array{mp.MC_data}(undef, n_temps)
@@ -269,14 +269,14 @@ function amhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::In
         else
             mp.initialize_poly!(polymers[i_temp])
         end
-    end 
+    end
 
-    
+
     param_series = zeros(n_feats+1,n_params)
     overlaps = zeros(n_feats+1, n_samples)
     avg_overlaps = zeros(n_feats+1)
     #cov_overlaps = zeros(n_feats+1, n_feats+1)
-    
+
     theta = zeros(n_feats+1)    #from theta[1] to theta[n_feats] we have the regression weights, theta[n_feats+1] is the spins coupling
     trial_theta = zeros(n_feats+1)
     theta .= initial_theta
@@ -292,12 +292,12 @@ function amhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::In
         fields .+= features[:,i] .* theta[i]
     end
     #############################################################
-    
-    
+
+
     for i_eq in 1:20
         mp.MMC_run!(polymers,trajs,n_strides,stride,inv_temps, theta[n_feats+1], fields) # theta[n_feats+1 is the coupling]
     end
-    
+
     param_series[:,1] .= theta
     acceptance = 0.0
 
@@ -308,7 +308,7 @@ function amhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::In
         end
     end
 
-    
+
     energy_correction = 0.0
 
     ##
@@ -316,20 +316,20 @@ function amhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::In
     ##
 
     for i_param in 2:n_params
-        
+
         theta_variation .= (2 .* rand(n_feats+1) .-1) .*delta_theta
         ###
         #theta_variation[n_feats+1] = 0.0
         ###
         trial_theta .= theta .+ theta_variation
-        
-    
+
+
         if trial_theta[n_feats+1]>0 && trial_theta[n_feats+1]<= 1.0
             trial_fields = zeros(n_mono)
             for i in 1:n_feats
                 trial_fields .+= features[:,i] .* trial_theta[i]
             end
-            
+
             trial_energy = 0
             for i_data in 1:n_data
                 for i_mono in 1:n_mono
@@ -341,8 +341,8 @@ function amhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::In
 
             mp.MMC_run!(polymers,trajs,n_strides,stride,inv_temps, theta[n_feats+1], fields) # This is an short equilibration run so that the expectations are a bit better when changing weights
             mp.MMC_run!(polymers,trajs,n_strides,stride,inv_temps,spins_configs,ising_energies,sample_lag,n_samples, theta[n_feats+1], fields)
-            
-            
+
+
             fill!(overlaps, 0.0)
             for i_sample in 1:n_samples
                 for i_feat in 1:n_feats
@@ -353,9 +353,9 @@ function amhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::In
                 overlaps[n_feats+1, i_sample] = ising_energies[i_sample]
             end
 
-            
+
             avg_overlaps = vec(mean(overlaps, dims=2))
-            
+
             energy_correction = 0
             #linear correction
             for j in 1:n_feats+1
@@ -363,7 +363,7 @@ function amhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::In
             end
             energy_correction = energy_correction * n_data
             ##################################################
-            
+
             energy_correction_J = 0.0
             for i_data in 1:n_data
                 mp.set_spins!(polymers, data_spins[i_data,:])
@@ -373,7 +373,7 @@ function amhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::In
                 energy_correction_J += mean(ising_energies) * theta_variation[n_feats+1]
             end
 
-            
+
             ##################################################
             delta_acc = -(trial_energy - energy) - energy_correction + energy_correction_J
             delta_acc>=0 ? acceptance=1 : acceptance=exp(delta_acc)
@@ -405,12 +405,12 @@ function amhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::In
     end
     println("Acceptance ratio: ", accepted_moves/n_params)
 
- 
+
     !isdir("AMHI_data") && mkdir("AMHI_data")
     open("AMHI_data/thetas_$(n_data)amh$(n_samples)_$(delta_theta).txt", "w") do io
         writedlm(io, param_series)
     end
-    
+
     mp.write_results(polymers[1],trajs[1])
 
 end
@@ -441,14 +441,14 @@ function Qamhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::I
     accepted_moves = 0
     n_strides = cld(n_samples*sample_lag, stride) # integer ceiling of the division
     #spins_coupling = 0.5
-    
+
     #inv_temps = [1.0, 0.9, 0.8, 0.74, 0.65, 0.62, 0.6, 0.55, 0.5, 0.4]
     inv_temps = [1.0, 0.96, 0.92, 0.89, 0.85, 0.83, 0.82, 0.79, 0.75, 0.67, 0.57, 0.5, 0.4]
     n_temps = length(inv_temps)
 
     spins_configs = zeros(Int, n_mono, n_samples) # where you store the generated data
     ising_energies = zeros(n_samples)
-    
+
     ########################################################### Initialize some quantitites in this section
     polymers = Array{mp.Magnetic_polymer}(undef, n_temps)
     trajs = Array{mp.MC_data}(undef, n_temps)
@@ -460,7 +460,7 @@ function Qamhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::I
         #else
         mp.initialize_poly!(polymers[i_temp])
         #end
-    end 
+    end
 
     polymers_2 = Array{mp.Magnetic_polymer}(undef, n_temps)
     trajs_2 = Array{mp.MC_data}(undef, n_temps)
@@ -474,19 +474,19 @@ function Qamhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::I
         println("scratch initialization")
         mp.initialize_poly!(polymers_2[i_temp])
         #end
-    end 
+    end
 
-    
+
     param_series = zeros(n_feats+1,n_params)
     #avg_spins = zeros(n_mono, n_samples)
     overlaps = zeros(n_feats+1, n_samples)
     avg_overlaps = zeros(n_feats+1)
     cov_overlaps = zeros(n_feats+1, n_feats+1)
-    
+
     theta = zeros(n_feats+1)
     trial_theta = zeros(n_feats+1)
     theta .= initial_theta
-    if theta[n_feats+1] <= 0 
+    if theta[n_feats+1] <= 0
         theta[n_feats+1] = 0.5
     end
 
@@ -495,7 +495,7 @@ function Qamhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::I
         fields .+= features[:,i] .* theta[i]
     end
     #############################################################
-    
+
     mp.set_spins!(polymers_2, data_spins[1,:])
     for i_eq in 1:500
         mp.MMC_run!(polymers,  trajs,  n_strides,stride,inv_temps, theta[n_feats+1], fields)  #theta[n_feats+1] is the spin coupling
@@ -504,7 +504,7 @@ function Qamhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::I
             println(i_eq)
         end
     end
-    
+
     param_series[:,1] .= theta
     acceptance = 0.0
 
@@ -522,29 +522,29 @@ function Qamhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::I
     ##
 
     for i_param in 2:n_params
-        
+
         #theta_variation .= (2 .* rand(n_feats+1) .-1) .*delta_theta
         theta_variation .= randn(n_feats+1) .* delta_theta
         trial_theta .= theta .+ theta_variation
-        
+
         if trial_theta[n_feats+1] > 0 #&& trial_theta[n_feats+1] <= 1.0
             trial_fields = zeros(n_mono)
             for i in 1:n_feats
                 trial_fields .+= features[:,i] .* trial_theta[i]
             end
-            
+
             trial_energy = 0
             for i_data in 1:n_data
                 for i_mono in 1:n_mono
                     trial_energy -= trial_fields[i_mono]*data_spins[i_data,i_mono]
                 end
             end
-            
+
 
             mp.MMC_run!(polymers,trajs,n_strides,stride,inv_temps, theta[n_feats+1], fields) # This is an short equilibration run so that the expectations are a bit better when changing weights
             mp.MMC_run!(polymers,trajs,n_strides,stride,inv_temps,spins_configs,ising_energies, sample_lag,n_samples, theta[n_feats+1], fields)
-            
-            
+
+
             fill!(overlaps, 0.0)
             for i_sample in 1:n_samples
                 for i_feat in 1:n_feats
@@ -555,10 +555,10 @@ function Qamhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::I
                 overlaps[n_feats+1, i_sample] = ising_energies[i_sample]
             end
 
-            #overlaps = features'*spins_configs ## shorter but maybe less efficient way to write stuff in the previous nested for loops 
+            #overlaps = features'*spins_configs ## shorter but maybe less efficient way to write stuff in the previous nested for loops
             avg_overlaps = vec(mean(overlaps, dims=2))
             cov_overlaps = cov(overlaps, dims=2)
-            
+
             energy_correction = 0
             #linear correction
             for j in 1:n_feats+1
@@ -575,7 +575,7 @@ function Qamhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::I
             energy_correction = energy_correction * n_data
 
             ##################################################
-            
+
             energy_correction_J = 0.0
             for i_data in 1:n_data
                 mp.set_spins!(polymers_2, data_spins[i_data,:])
@@ -585,9 +585,9 @@ function Qamhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::I
                 energy_correction_J += mean(ising_energies) * theta_variation[n_feats+1] + 0.5 * theta_variation[n_feats+1]^2 * var(ising_energies)
             end
 
-            
+
             ##################################################
-            
+
             delta_acc = -(trial_energy - energy) - energy_correction + energy_correction_J
             delta_acc>=0 ? acceptance=1 : acceptance=exp(delta_acc)
             if i_param%10 == 0
@@ -627,12 +627,12 @@ function Qamhi_polymer(n_samples::Int, sample_lag::Int, stride::Int, n_params::I
     end
     println("Acceptance ratio: ", accepted_moves/n_params)
 
- 
+
     !isdir("AMHI_data") && mkdir("AMHI_data")
     open("AMHI_data/thetas_$(n_data)Qamh$(n_samples)_$(delta_theta).txt", "w") do io
         writedlm(io, param_series)
     end
-    
+
     mp.write_results(polymers[1],trajs[1])
 
 end
@@ -643,7 +643,7 @@ end
 
 function generate_data(n_data::Int, features_file::String, n_strides::Int, weights::Array{Float64}, spins_coupling::Float64)
     io = open(features_file, "r")
-    features = readdlm(io,Float64)
+    features = readdlm(io,Float64)[1601:end,:] ### just temporary range
     close(io)
     n_mono = size(features, 1)
     n_feats = size(features, 2)
@@ -651,8 +651,8 @@ function generate_data(n_data::Int, features_file::String, n_strides::Int, weigh
     #spins_coupling = 1.25
     println(spins_coupling, weights)
     #inv_temps = [10000.0, 0.9, 0.8, 0.74, 0.65, 0.62, 0.6, 0.55, 0.5, 0.4]
-    inv_temps = [5, 0.01]
-    #inv_temps = [1.0, 0.96, 0.92, 0.89, 0.85, 0.83, 0.82, 0.79, 0.75, 0.67, 0.57, 0.5, 0.4]
+    #inv_temps = [5, 0.01]
+    inv_temps = [1.0, 0.96, 0.92, 0.89, 0.85, 0.83, 0.82, 0.79, 0.75, 0.67, 0.57, 0.5, 0.4]
     n_temps = length(inv_temps)
     stride = 100
 
@@ -667,28 +667,28 @@ function generate_data(n_data::Int, features_file::String, n_strides::Int, weigh
         #else
         mp.initialize_poly!(polymers[i_temp])
         #end
-    end 
+    end
 
     fields = zeros(n_mono)
     for i in 1:n_feats
         fields .+= features[:,i] .* weights[i]
     end
     #mp.set_fields!(polymers, fields)
-    
+
     #here I run the simulation for a while in order to equilibrate the chain
     for i_burnin in 1:50
         println("burnin number: ", i_burnin)
         mp.MMC_run!(polymers, trajs, n_strides, stride, inv_temps, spins_coupling, fields)
     end
-    
+
     #n_data = 500
     summary_stats = zeros(n_feats,n_data)
     spins_conf = zeros(Int,n_mono,n_data)
-    
 
-    
+
+
     poly_confs = zeros(Int,n_data*3,n_mono)
-    
+
 
     for i_data in 1:n_data
         println("Number of data point:  ", i_data)
@@ -744,7 +744,7 @@ function generate_data_posterior_predictive(features_file::String, n_strides::In
     close(io)
     n_param = size(post_samples, 2)
     println(post_samples[:,1])
-    
+
 
     inv_temps = [1.0, 0.96, 0.92, 0.89, 0.85, 0.83, 0.82, 0.79, 0.75, 0.67, 0.57, 0.5, 0.4]
     n_temps = length(inv_temps)
@@ -753,7 +753,7 @@ function generate_data_posterior_predictive(features_file::String, n_strides::In
     n_data = n_data_per_param * n_param
     println(n_data)
 
-    spins_conf = zeros(Int,n_mono,n_data) 
+    spins_conf = zeros(Int,n_mono,n_data)
     poly_confs = zeros(Int,n_data*3,n_mono)
 
     polymers = Array{mp.Magnetic_polymer}(undef, n_temps)
@@ -762,7 +762,7 @@ function generate_data_posterior_predictive(features_file::String, n_strides::In
         polymers[i_temp] = mp.Magnetic_polymer(n_mono)#, inv_temps[i_temp], spins_coupling, alpha)
         trajs[i_temp] = mp.MC_data(n_strides*stride)
         mp.initialize_poly!(polymers[i_temp])
-    end 
+    end
 
     ###################################################################
 
@@ -771,7 +771,7 @@ function generate_data_posterior_predictive(features_file::String, n_strides::In
         fields .+= features[:,i] .* post_samples[i,1]
     end
     #mp.set_fields!(polymers, fields)
-    
+
     #here I run the simulation for a while in order to equilibrate the chain
     for i_burnin in 1:2
         println("burnin number: ", i_burnin)
@@ -808,7 +808,7 @@ function generate_data_posterior_predictive(features_file::String, n_strides::In
         #writedlm(io,transpose([weights; spins_coupling]))
         writedlm(io,transpose(spins_conf))
     end
-    
+
     open("poly_confs_$(param_file)","w") do io
         #writedlm(io,transpose([weights; spins_coupling]))
         writedlm(io, poly_confs)
@@ -816,4 +816,3 @@ function generate_data_posterior_predictive(features_file::String, n_strides::In
 
 
 end
-
