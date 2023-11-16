@@ -7,10 +7,10 @@ magpoly/.ipynb_checkpoints/
 magpoly/simulation_data/
 magpoly/SL_data/
 magpoly/AMHI_data/
-magpoly_2/.ipynb_checkpoints/
-magpoly_2/simulation_data/
-magpoly_2/SL_data/
-magpoly_2/AMHI_data/
+magnetic_polymer/.ipynb_checkpoints/
+magnetic_polymer/simulation_data/
+magnetic_polymer/SL_data/
+magnetic_polymer/AMHI_data/
 CG_content_433.txt
 final_config*.txt
 data_file*.txt
