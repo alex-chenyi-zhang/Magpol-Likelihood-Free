@@ -13,7 +13,7 @@ for i in 1:6
         else
             pivot_moves[p_moves_count, 1, :] .= perms[i,:]
             pivot_moves[p_moves_count, 2, :] .= tr_signs[j,:]
-            
+
             global p_moves_count += 1
         end
     end
@@ -34,7 +34,7 @@ struct Magnetic_polymer{T1<:Int}
 end
 
 
-function Magnetic_polymer(n_mono::Int64) 
+function Magnetic_polymer(n_mono::Int64)
     Magnetic_polymer(n_mono, zeros(Int, n_mono), zeros(Int, 3,n_mono),
     zeros(Int, 3,n_mono), Dict{Int, Int}(), zeros(Int, 7,n_mono), zeros(Int, 7,n_mono))
 end
@@ -44,7 +44,7 @@ function initialize_poly!(poly::Magnetic_polymer, spin_values::Array{Int})
     #poly.fields .= (rand(poly.n_mono).*2) .-1
     for i_mono in 1:poly.n_mono
         poly.coord[1, i_mono] = i_mono-1
-    end    
+    end
     for i_mono in 1:poly.n_mono
         for j in 1:3
             poly.trial_coord[j, i_mono] = poly.coord[j, i_mono]
@@ -122,8 +122,8 @@ function try_pivot!(k::Int, move::Int, coo::Array{Int,2}, t_coo::Array{Int,2}, n
     end
 
     #t_coo[:,1:k] .= coo[:,1:k]
-    
-    
+
+
     for i_mono in k+1:n_mono
         for j in 1:3
             t_coo[j,i_mono] = (pivot_moves[move,2,j]*(coo[pivot_moves[move,1,j],i_mono]
@@ -161,7 +161,7 @@ function checksaw!(k::Int, pol::Magnetic_polymer, a::Int)
 end
 
 #########################################################################
-## poi quando si faranno le mosse locali non si userà questa funnzione perché 
+## poi quando si faranno le mosse locali non si userà questa funnzione perché
 ## non ci sarà bisogno di ricalcolare TUTTA la lista dei vicini
 function compute_neighbours!(coo::Array{Int,2}, near::Array{Int,2}, dic::Dict{Int,Int}, a::Int, n_mono::Int)
     for i_mono in 1:n_mono
@@ -237,7 +237,7 @@ function single_bead_flip!(t_coo::Array{Int,2}, dic::Dict{Int, Int}, n_mono::Int
         for j in 1:3
             saw_key += (t_coo[j,mono-1]+t_coo[j,mono+1]-t_coo[j,mono])*a^(3-j)
         end
-        
+
         if !haskey(dic,saw_key)
             delete!(dic, t_coo[1,mono]*a^2 + t_coo[2,mono]*a + t_coo[3,mono])
             for j in 1:3
@@ -309,11 +309,11 @@ function crankshaft_90_270!(t_coo::Array{Int,2}, dic::Dict{Int, Int}, n_mono::In
             println("Invalid Rotation Axis!")
         end
 
-        for j in 1:3 
+        for j in 1:3
             new_coord1[j] = t_coo[j,mono] + tr_signs[t,j]*(t_coo[perms[p,j],mono+1]-t_coo[perms[p,j],mono])*orient
             new_coord2[j] = t_coo[j,mono+3] + tr_signs[t,j]*(t_coo[perms[p,j],mono+2]-t_coo[perms[p,j],mono+3])*orient
         end
-        
+
         saw_key1 = new_coord1[1]*a^2 + new_coord1[2]*a + new_coord1[3]
         saw_key2 = new_coord2[1]*a^2 + new_coord2[2]*a + new_coord2[3]
         if !haskey(dic,saw_key1) && !haskey(dic,saw_key2)
@@ -326,7 +326,7 @@ function crankshaft_90_270!(t_coo::Array{Int,2}, dic::Dict{Int, Int}, n_mono::In
             dic[saw_key1] = mono+1
             dic[saw_key2] = mono+2
         end
-    end 
+    end
 end
 
 
@@ -373,20 +373,20 @@ end
 #########################################################################
 
 #= This is the version of MC_run where I don't save the configurations of the spins (only the last one)
-   This is useful if I just want to perform the simulation and I am interested only in storing the 
-    values of some observables along the markov chain. If instead I want to carry out some simulator 
-    based inference task, I will also need to save spin configurations. Expoiting julia's 
-    multiple dispatch feature I can always use the same "MC_run!()" function, the specific method 
+   This is useful if I just want to perform the simulation and I am interested only in storing the
+    values of some observables along the markov chain. If instead I want to carry out some simulator
+    based inference task, I will also need to save spin configurations. Expoiting julia's
+    multiple dispatch feature I can always use the same "MC_run!()" function, the specific method
     is inferred by the compiler depending on the list of argument types. "MC_run_save!()" is the function
     that save the configurations and it will also be made into a MC_run!() module=#
 
-function MC_run_base!(pol::Magnetic_polymer, traj::MC_data, start::Int, finish::Int, inv_temp::Float64, 
+function MC_run_base!(pol::Magnetic_polymer, traj::MC_data, start::Int, finish::Int, inv_temp::Float64,
                 J::Float64, fields::Array{Float64}, quenched_spins::Bool=false)
     #for i_mono in 1:pol.n_mono
     #    for j in 1:3
     #        pol.trial_coord[j,i_mono] = pol.coord[j,i_mono]
     #    end
-    #end 
+    #end
     pol.trial_coord .= pol.coord
     new_coord1 = zeros(Int,3)
     new_coord2 = zeros(Int,3)
@@ -396,10 +396,10 @@ function MC_run_base!(pol::Magnetic_polymer, traj::MC_data, start::Int, finish::
       I represent the possible positions of the monomers in the cubic lattice
       as seeing the vector of coordinates as the representation in base "hash_base".
       e.g. (xi,yi,zi) --> xi*hash_base^2 + yi*hash_base + zi*1
-      Since the polymer is fixed in the origin the coordinates are ≤ n_mono in modulus, so if I take hash_base 
-      >= 2*n_mono + 1, the mapping I think it should be 1-to-1. This speeds up the code significantly as the 
-      hashing of integer valued keys for the dictionary containing a certain polymer config. is much 
-      cheaper than hashing keys which are arrays sliced from a matrix 
+      Since the polymer is fixed in the origin the coordinates are ≤ n_mono in modulus, so if I take hash_base
+      >= 2*n_mono + 1, the mapping I think it should be 1-to-1. This speeds up the code significantly as the
+      hashing of integer valued keys for the dictionary containing a certain polymer config. is much
+      cheaper than hashing keys which are arrays sliced from a matrix
     =#
     hash_base = 2*pol.n_mono + 1
 
@@ -412,7 +412,7 @@ function MC_run_base!(pol::Magnetic_polymer, traj::MC_data, start::Int, finish::
     traj.rg2[start] = gyration_radius_squared(pol)
 
     empty!(pol.hash_saw)
-    
+
     for i_step in (start+1):finish
         pivot = rand(2:pol.n_mono-1)
         p_move = rand(1:47)
@@ -450,7 +450,7 @@ function MC_run_base!(pol::Magnetic_polymer, traj::MC_data, start::Int, finish::
                 crankshaft_90_270!(pol.trial_coord,pol.hash_saw,pol.n_mono,hash_base,new_coord1,new_coord2)
             end
         end
-        
+
         compute_neighbours!(pol.trial_coord, pol.trial_neighbours, pol.hash_saw, hash_base, pol.n_mono)
         trial_energy, _ = compute_new_energy(pol,pol.trial_neighbours,fields, pol.spins, J)
         delta_energy = trial_energy - energy
@@ -474,7 +474,7 @@ function MC_run_base!(pol::Magnetic_polymer, traj::MC_data, start::Int, finish::
            # println(delta_energy, "   " ,acc )
 
         end
-        
+
         if !quenched_spins
             delta_ene, _ = spins_MC!(pol, pol.n_mono,fields,pol.spins,pol.neighbours, J, inv_temp) ## spins_MC! return the total energy variation of the accepted spin n_flips
             energy += delta_ene
@@ -484,7 +484,7 @@ function MC_run_base!(pol::Magnetic_polymer, traj::MC_data, start::Int, finish::
         #traj.magnetization[i_step] = mean(pol.spins)
         #traj.energies[i_step] = energy
 
-        # This next if ... end can be removed. I kept as a sanity check in an early stage 
+        # This next if ... end can be removed. I kept as a sanity check in an early stage
         # when I had problems with the computation of the nearest neighbours
         #=if !isinteger(energy)
             println("Non integer energy:  ", energy)
@@ -507,13 +507,13 @@ end
 #########################################################################
 
 # This function is like MC_run_base! but also save configurations
-function MC_run_save!(pol::Magnetic_polymer, traj::MC_data, start::Int, finish::Int, spins_configs::Matrix{Int}, 
+function MC_run_save!(pol::Magnetic_polymer, traj::MC_data, start::Int, finish::Int, spins_configs::Matrix{Int},
                 sample_lag::Int, n_samples::Int, inv_temp::Float64, J::Float64, fields::Array{Float64}, quenched_spins::Bool=false)
     for i_mono in 1:pol.n_mono
         for j in 1:3
             pol.trial_coord[j,i_mono] = pol.coord[j,i_mono]
         end
-    end 
+    end
     new_coord1 = zeros(Int,3)
     new_coord2 = zeros(Int,3)
     n_acc = 0
@@ -537,7 +537,7 @@ function MC_run_save!(pol::Magnetic_polymer, traj::MC_data, start::Int, finish::
             spins_configs[i_mono, i_sample]  = pol.spins[i_mono]
         end
     end
-    
+
     for i_step in (start+1):min(finish,sample_lag*n_samples)
         pivot = rand(2:pol.n_mono-1)
         p_move = rand(1:47)
@@ -574,7 +574,7 @@ function MC_run_save!(pol::Magnetic_polymer, traj::MC_data, start::Int, finish::
                 crankshaft_90_270!(pol.trial_coord,pol.hash_saw,pol.n_mono,hash_base,new_coord1,new_coord2)
             end
         end
-        
+
         compute_neighbours!(pol.trial_coord, pol.trial_neighbours, pol.hash_saw, hash_base, pol.n_mono)
         trial_energy,_ = compute_new_energy(pol,pol.trial_neighbours,fields, pol.spins, J)
         delta_energy = trial_energy - energy
@@ -594,7 +594,7 @@ function MC_run_save!(pol::Magnetic_polymer, traj::MC_data, start::Int, finish::
             energy = trial_energy
             n_acc += 1
         end
-        
+
         if !quenched_spins
             delta_ene, _ = spins_MC!(pol, pol.n_mono,fields,pol.spins,pol.neighbours, J, inv_temp) ## spins_MC! return the total energy variation of the accepted spin n_flips
             energy += delta_ene
@@ -632,7 +632,7 @@ function MC_run_save!(pol::Magnetic_polymer, traj::MC_data, start::Int, finish::
         for j in 1:3
             pol.trial_coord[j,i_mono] = pol.coord[j,i_mono]
         end
-    end 
+    end
     new_coord1 = zeros(Int,3)
     new_coord2 = zeros(Int,3)
     n_acc = 0
@@ -657,7 +657,7 @@ function MC_run_save!(pol::Magnetic_polymer, traj::MC_data, start::Int, finish::
         end
         ising_energies[i_sample] = -ising_energy/J   # actually I save the negative
     end
-    
+
     for i_step in (start+1):min(finish,sample_lag*n_samples)
         pivot = rand(2:pol.n_mono-1)
         p_move = rand(1:47)
@@ -694,7 +694,7 @@ function MC_run_save!(pol::Magnetic_polymer, traj::MC_data, start::Int, finish::
                 crankshaft_90_270!(pol.trial_coord,pol.hash_saw,pol.n_mono,hash_base,new_coord1,new_coord2)
             end
         end
-        
+
         compute_neighbours!(pol.trial_coord, pol.trial_neighbours, pol.hash_saw, hash_base, pol.n_mono)
         trial_energy, trial_energy_J = compute_new_energy(pol,pol.trial_neighbours,fields, pol.spins, J)
         delta_energy = trial_energy - energy
@@ -715,7 +715,7 @@ function MC_run_save!(pol::Magnetic_polymer, traj::MC_data, start::Int, finish::
             ising_energy = trial_energy_J
             n_acc += 1
         end
-        
+
         if !quenched_spins
             delta_ene, delta_ene_J = spins_MC!(pol, pol.n_mono,fields,pol.spins,pol.neighbours, J, inv_temp) ## spins_MC! return the total energy variation of the accepted spin n_flips
             energy += delta_ene
@@ -767,7 +767,7 @@ function MMC_run_base!(polymers::Array{Magnetic_polymer}, trajs::Array{MC_data},
         if alpha_swap >= rand()
             for i_mono in 1:polymers[1].n_mono
                 for j in 1:3
-                   temp_coord[j] = polymers[swap].coord[j,i_mono] 
+                   temp_coord[j] = polymers[swap].coord[j,i_mono]
                    polymers[swap].coord[j,i_mono] = polymers[swap+1].coord[j,i_mono]
                    polymers[swap+1].coord[j,i_mono] =  temp_coord[j]
                 end
@@ -782,7 +782,7 @@ function MMC_run_base!(polymers::Array{Magnetic_polymer}, trajs::Array{MC_data},
             MC_run!(polymers[i_temp], trajs[i_temp],(i_strides-1)*stride+1,i_strides*stride, inv_temps[i_temp], J, fields, quenched_spins)
         end
     end
-    println("Accepted_swaps: ", accepted_swaps)
+    #println("Accepted_swaps: ", accepted_swaps)
 end
 
 function MMC_run_save!(polymers::Array{Magnetic_polymer}, trajs::Array{MC_data},
@@ -806,11 +806,11 @@ function MMC_run_save!(polymers::Array{Magnetic_polymer}, trajs::Array{MC_data},
         if alpha_swap >= rand()
             for i_mono in 1:polymers[1].n_mono
                 for j in 1:3
-                   temp_coord[j] = polymers[swap].coord[j,i_mono] 
+                   temp_coord[j] = polymers[swap].coord[j,i_mono]
                    polymers[swap].coord[j,i_mono] = polymers[swap+1].coord[j,i_mono]
                    polymers[swap+1].coord[j,i_mono] =  temp_coord[j]
                 end
-                
+
             end
             if !quenched_spins
                 for i_mono in 1:polymers[1].n_mono
@@ -828,7 +828,7 @@ function MMC_run_save!(polymers::Array{Magnetic_polymer}, trajs::Array{MC_data},
             MC_run!(polymers[i_temp], trajs[i_temp],(i_strides-1)*stride+1,i_strides*stride, sample_lag, n_samples, inv_temps[i_temp], J, fields, quenched_spins)
         end
     end
-    println("Accepted_swaps: ", accepted_swaps)
+    #println("Accepted_swaps: ", accepted_swaps)
 end
 
 ### This one calls for the lower temperature chain the MC_run() method that also saves the ising energies
@@ -853,7 +853,7 @@ function MMC_run_save!(polymers::Array{Magnetic_polymer}, trajs::Array{MC_data},
         if alpha_swap >= rand()
             for i_mono in 1:polymers[1].n_mono
                 for j in 1:3
-                    temp_coord[j] = polymers[swap].coord[j,i_mono] 
+                    temp_coord[j] = polymers[swap].coord[j,i_mono]
                     polymers[swap].coord[j,i_mono] = polymers[swap+1].coord[j,i_mono]
                     polymers[swap+1].coord[j,i_mono] =  temp_coord[j]
                 end
@@ -874,5 +874,5 @@ function MMC_run_save!(polymers::Array{Magnetic_polymer}, trajs::Array{MC_data},
             MC_run!(polymers[i_temp], trajs[i_temp],(i_strides-1)*stride+1,i_strides*stride, sample_lag, n_samples, inv_temps[i_temp], J, fields, quenched_spins)
         end
     end
-    println("Accepted_swaps: ", accepted_swaps)
+    #println("Accepted_swaps: ", accepted_swaps)
 end
